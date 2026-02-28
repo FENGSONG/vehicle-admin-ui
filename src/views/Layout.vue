@@ -13,10 +13,10 @@
       <div class="sidebar-title">探索</div>
       <div 
         v-for="item in menuItems" 
-        :key="item.index"
+        :key="item.path"
         class="mac-menu-item"
-        :class="{ active: activeMenu === item.index }"
-        @click="handleMenuClick(item.index)"
+        :class="{ active: currentPath === item.path }"
+        @click="handleMenuClick(item)"
       >
         <el-icon><component :is="item.icon" /></el-icon>
         <span>{{ item.title }}</span>
@@ -40,64 +40,32 @@
           <img src="@/assets/school-logo.png" alt="学校Logo" class="school-logo" />
         </div>
 
-        <h1 class="mac-page-title">
-          {{ menuItems.find(item => item.index === activeMenu)?.title }}
-        </h1>
-        <div class="mac-divider"></div>
-
-        <div class="mac-hero-card">
-          <div class="hero-text">
-            <div class="hero-subtitle">今日重磅推荐</div>
-            <div class="hero-title">全新车辆调度引擎上线</div>
-            <div class="hero-desc">体验前所未有的管理效率与丝滑交互。</div>
-          </div>
-          <div class="hero-button">获取</div>
-        </div>
-
-        <h2 class="mac-section-title">数据速览</h2>
-        <div class="mac-grid">
-          <div class="mac-data-card">
-            <div class="card-icon blue"><el-icon><Van /></el-icon></div>
-            <div class="card-info">
-              <h3>活跃车辆</h3>
-              <p class="number">128</p>
-            </div>
-          </div>
-          <div class="mac-data-card">
-            <div class="card-icon purple"><el-icon><User /></el-icon></div>
-            <div class="card-info">
-              <h3>在线用户</h3>
-              <p class="number">32</p>
-            </div>
-          </div>
-          <div class="mac-data-card">
-            <div class="card-icon green"><el-icon><DataLine /></el-icon></div>
-            <div class="card-info">
-              <h3>今日单量</h3>
-              <p class="number">1,024</p>
-            </div>
-          </div>
-        </div>
-
+        <router-view v-slot="{ Component }">
+          <transition name="fade" mode="out-in">
+            <component :is="Component" />
+          </transition>
+        </router-view>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { Search, DataLine, Van, User, SwitchButton, Expand, Fold } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 const router = useRouter()
+const route = useRoute() // 引入 route 来获取当前路径
 const searchQuery = ref('')
-const activeMenu = ref('1')
 const isMobileMenuHidden = ref(false)
 
-// 响应式处理：初始化检查屏幕宽度
+//  计算属性：实时获取当前路由路径，解决刷新后高亮丢失的问题
+const currentPath = computed(() => route.path)
+
 const checkWidth = () => {
-  isMobileMenuHidden.ref = window.innerWidth < 1024
+  isMobileMenuHidden.value = window.innerWidth < 1024
 }
 
 onMounted(() => {
@@ -109,8 +77,15 @@ onUnmounted(() => {
   window.removeEventListener('resize', checkWidth)
 })
 
-const handleMenuClick = (index) => {
-  activeMenu.value = index
+// 菜单数据
+const menuItems = [
+  { title: '数据大盘', icon: DataLine, path: '/layout/dashboard' },
+  { title: '车辆管理', icon: Van, path: '/layout/vehicle' },
+  { title: '用户管理', icon: User, path: '/layout/user' }
+]
+
+const handleMenuClick = (item) => {
+  router.push(item.path)
   if (window.innerWidth < 1024) {
     isMobileMenuHidden.value = true
   }
@@ -121,12 +96,6 @@ const closeSidebarOnMobile = () => {
     isMobileMenuHidden.value = true
   }
 }
-
-const menuItems = [
-  { index: '1', title: '数据大盘', icon: DataLine },
-  { index: '2', title: '车辆管理', icon: Van },
-  { index: '3', title: '用户管理', icon: User }
-]
 
 const handleLogout = () => {
   ElMessageBox.confirm('确定要退出当前账号吗？', '退出登录', {
@@ -165,7 +134,6 @@ const handleLogout = () => {
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* 移动端菜单切换按钮 */
 .mobile-menu-toggle {
   display: none;
   position: fixed;
@@ -179,7 +147,6 @@ const handleLogout = () => {
   cursor: pointer;
 }
 
-/* --- 主内容区 --- */
 .mac-main {
   flex: 1;
   background-color: #ffffff;
@@ -195,17 +162,16 @@ const handleLogout = () => {
   transition: padding 0.3s ease;
 }
 
-/* --- 学校 Logo 响应式 (放大二倍基础) --- */
 .mac-school-branding {
   position: absolute;
-  top: 40px;
+  top: 25px;
   right: 60px;
   z-index: 100;
   transition: all 0.3s ease;
 }
 
 .school-logo {
-  width: 240px; /* 默认放大二倍 */
+  width: 240px; 
   height: auto;
   border-radius: 12px;
   background: white;
@@ -214,80 +180,39 @@ const handleLogout = () => {
   transition: transform 0.3s ease;
 }
 
-/* --- 栅格布局响应式 --- */
-.mac-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr); /* 默认三列 */
-  gap: 20px;
+/*  新增：路由切换时的淡入淡出动画 */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+.fade-enter-from {
+  opacity: 0;
+  transform: translateY(10px);
+}
+.fade-leave-to {
+  opacity: 0;
+  transform: translateY(-10px);
 }
 
-/* =============================================
-    响应式断点设置
-   ============================================= */
-
-/* 1. 窄屏笔记本/平板 (小于 1200px) */
 @media (max-width: 1200px) {
-  .mac-content {
-    padding: 40px 30px;
-  }
-  .school-logo {
-    width: 180px; /* 稍微缩小 Logo */
-  }
-  .mac-grid {
-    grid-template-columns: repeat(2, 1fr); /* 变为两列 */
-  }
+  .mac-content { padding: 40px 30px; }
+  .school-logo { width: 180px; }
 }
 
-/* 2. 平板模式 (小于 1024px) */
 @media (max-width: 1024px) {
-  .mobile-menu-toggle {
-    display: flex;
-  }
-  .mac-sidebar {
-    position: fixed;
-    height: 100vh;
-    left: 0;
-  }
-  .sidebar-hidden {
-    transform: translateX(-100%); /* 隐藏侧边栏 */
-  }
-  .mac-school-branding {
-    right: 30px;
-  }
+  .mobile-menu-toggle { display: flex; }
+  .mac-sidebar { position: fixed; height: 100vh; left: 0; }
+  .sidebar-hidden { transform: translateX(-100%); }
+  .mac-school-branding { right: 30px; }
 }
 
-/* 3. 手机模式 (小于 768px) */
 @media (max-width: 768px) {
-  .mac-content {
-    padding: 80px 20px 40px; /* 顶部留出切换按钮空间 */
-  }
-  .mac-page-title {
-    font-size: 26px;
-  }
-  .mac-school-branding {
-    position: relative; /* 手机端改为流式布局，避免挡住文字 */
-    top: 0;
-    right: 0;
-    margin-bottom: 20px;
-    display: flex;
-    justify-content: center;
-  }
-  .school-logo {
-    width: 160px; /* 手机端再次缩小 */
-  }
-  .mac-grid {
-    grid-template-columns: 1fr; /* 变为一列 */
-  }
-  .mac-hero-card {
-    height: 240px;
-    padding: 20px;
-  }
-  .hero-title {
-    font-size: 20px;
-  }
+  .mac-content { padding: 80px 20px 40px; }
+  .mac-school-branding { position: relative; top: 0; right: 0; margin-bottom: 20px; display: flex; justify-content: center; }
+  .school-logo { width: 160px; }
 }
 
-/* 其他基础样式保持不变 */
+/* 基础样式保留 */
 .mac-search-box { margin-bottom: 20px; padding: 0 10px; }
 :deep(.el-input__wrapper) { border-radius: 8px; background-color: rgba(0, 0, 0, 0.05); box-shadow: none !important; }
 .sidebar-title { font-size: 11px; font-weight: 600; color: #86868b; margin: 10px 15px; text-transform: uppercase; }
@@ -299,17 +224,4 @@ const handleLogout = () => {
 .mac-avatar { width: 32px; height: 32px; border-radius: 50%; margin-right: 10px; }
 .mac-username { font-size: 14px; font-weight: 500; flex: 1; }
 .logout-icon { color: #ff3b30; }
-.mac-divider { height: 1px; background-color: rgba(0, 0, 0, 0.08); margin-bottom: 30px; }
-.mac-hero-card { position: relative; border-radius: 18px; background: linear-gradient(135deg, #007aff 0%, #00c6ff 100%); color: white; display: flex; flex-direction: column; justify-content: flex-end; box-shadow: 0 10px 30px rgba(0, 122, 255, 0.3); margin-bottom: 40px; overflow: hidden; height: 320px; padding: 30px;}
-.hero-subtitle { font-size: 11px; font-weight: 600; opacity: 0.8; }
-.hero-desc { font-size: 14px; opacity: 0.9; }
-.hero-button { position: absolute; right: 20px; bottom: 20px; background: rgba(255, 255, 255, 0.2); backdrop-filter: blur(10px); padding: 6px 15px; border-radius: 20px; font-size: 12px; }
-.mac-section-title { font-size: 20px; font-weight: 600; margin-bottom: 15px; }
-.mac-data-card { background: #ffffff; border-radius: 16px; border: 1px solid rgba(0, 0, 0, 0.06); padding: 20px; display: flex; align-items: center; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03); }
-.card-icon { width: 44px; height: 44px; border-radius: 10px; display: flex; justify-content: center; align-items: center; font-size: 20px; margin-right: 12px; color: white; }
-.card-icon.blue { background-color: #007aff; }
-.card-icon.purple { background-color: #5856d6; }
-.card-icon.green { background-color: #34c759; }
-.card-info h3 { font-size: 12px; color: #86868b; margin-bottom: 2px; }
-.card-info .number { font-size: 20px; font-weight: 700; }
 </style>
