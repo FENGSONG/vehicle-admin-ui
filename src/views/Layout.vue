@@ -1,6 +1,6 @@
 <template>
   <div class="mac-layout">
-    <div class="mac-sidebar">
+    <div class="mac-sidebar" :class="{ 'sidebar-hidden': isMobileMenuHidden }">
       <div class="mac-search-box">
         <el-input
           v-model="searchQuery"
@@ -16,21 +16,30 @@
         :key="item.index"
         class="mac-menu-item"
         :class="{ active: activeMenu === item.index }"
-        @click="activeMenu = item.index"
+        @click="handleMenuClick(item.index)"
       >
         <el-icon><component :is="item.icon" /></el-icon>
         <span>{{ item.title }}</span>
       </div>
 
-      <div class="spacer"></div> <div class="mac-user-profile" @click="handleLogout">
+      <div class="spacer"></div> 
+      <div class="mac-user-profile" @click="handleLogout">
         <img src="https://cube.elemecdn.com/3/7c/3ea6beec64369c2642b92c6726f1epng.png" class="mac-avatar" />
         <span class="mac-username">管理员</span>
         <el-icon class="logout-icon"><SwitchButton /></el-icon>
       </div>
     </div>
 
-    <div class="mac-main">
+    <div class="mobile-menu-toggle" @click="isMobileMenuHidden = !isMobileMenuHidden">
+      <el-icon><Expand v-if="isMobileMenuHidden" /><Fold v-else /></el-icon>
+    </div>
+
+    <div class="mac-main" @click="closeSidebarOnMobile">
       <div class="mac-content">
+        <div class="mac-school-branding">
+          <img src="@/assets/school-logo.png" alt="学校Logo" class="school-logo" />
+        </div>
+
         <h1 class="mac-page-title">
           {{ menuItems.find(item => item.index === activeMenu)?.title }}
         </h1>
@@ -76,23 +85,49 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Search, DataLine, Van, User, SwitchButton } from '@element-plus/icons-vue'
+import { Search, DataLine, Van, User, SwitchButton, Expand, Fold } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 const router = useRouter()
 const searchQuery = ref('')
 const activeMenu = ref('1')
+const isMobileMenuHidden = ref(false)
 
-// 菜单数据
+// 响应式处理：初始化检查屏幕宽度
+const checkWidth = () => {
+  isMobileMenuHidden.ref = window.innerWidth < 1024
+}
+
+onMounted(() => {
+  checkWidth()
+  window.addEventListener('resize', checkWidth)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', checkWidth)
+})
+
+const handleMenuClick = (index) => {
+  activeMenu.value = index
+  if (window.innerWidth < 1024) {
+    isMobileMenuHidden.value = true
+  }
+}
+
+const closeSidebarOnMobile = () => {
+  if (window.innerWidth < 1024 && !isMobileMenuHidden.value) {
+    isMobileMenuHidden.value = true
+  }
+}
+
 const menuItems = [
   { index: '1', title: '数据大盘', icon: DataLine },
   { index: '2', title: '车辆管理', icon: Van },
   { index: '3', title: '用户管理', icon: User }
 ]
 
-// 退出登录带有苹果风格的确认框
 const handleLogout = () => {
   ElMessageBox.confirm('确定要退出当前账号吗？', '退出登录', {
     confirmButtonText: '退出',
@@ -107,232 +142,174 @@ const handleLogout = () => {
 </script>
 
 <style scoped>
-/*  核心苹果字体与背景底色 */
 .mac-layout {
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   display: flex;
   height: 100vh;
-  margin: -8px; /* 抵消浏览器默认边距 */
-  background-color: #f5f5f7; /* Mac 经典的底层浅灰底色 */
+  margin: -8px; 
+  background-color: #f5f5f7; 
   overflow: hidden;
 }
 
-/*  侧边栏：毛玻璃特效 */
+/* --- 响应式侧边栏 --- */
 .mac-sidebar {
   width: 260px;
-  background-color: rgba(235, 235, 240, 0.75); /* 半透明背景 */
-  backdrop-filter: blur(25px); /* 毛玻璃模糊参数 */
+  background-color: rgba(235, 235, 240, 0.75); 
+  backdrop-filter: blur(25px); 
   -webkit-backdrop-filter: blur(25px);
   border-right: 1px solid rgba(0, 0, 0, 0.05);
   display: flex;
   flex-direction: column;
   padding: 20px 12px;
-  z-index: 10;
+  z-index: 1000;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.mac-search-box {
-  margin-bottom: 20px;
-  padding: 0 10px;
-}
-/* 深度修改 Element 输入框样式使其圆润 */
-:deep(.el-input__wrapper) {
+/* 移动端菜单切换按钮 */
+.mobile-menu-toggle {
+  display: none;
+  position: fixed;
+  top: 20px;
+  left: 20px;
+  z-index: 1001;
+  background: white;
+  padding: 8px;
   border-radius: 8px;
-  background-color: rgba(0, 0, 0, 0.05);
-  box-shadow: none !important;
-}
-
-.sidebar-title {
-  font-size: 11px;
-  font-weight: 600;
-  color: #86868b;
-  margin: 10px 15px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-/* 菜单项：选中时的高亮圆角蓝底 */
-.mac-menu-item {
-  display: flex;
-  align-items: center;
-  padding: 8px 12px;
-  margin-bottom: 4px;
-  border-radius: 6px;
-  color: #1d1d1f;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
   cursor: pointer;
-  font-size: 14px;
-  font-weight: 500;
-  transition: all 0.2s ease;
-}
-.mac-menu-item:hover {
-  background-color: rgba(0, 0, 0, 0.05);
-}
-.mac-menu-item.active {
-  background-color: #007aff; /* 苹果系统级蓝色 */
-  color: white;
-}
-.mac-menu-item .el-icon {
-  margin-right: 10px;
-  font-size: 18px;
 }
 
-/* 侧边栏底部个人信息 */
-.spacer {
-  flex: 1;
-}
-.mac-user-profile {
-  display: flex;
-  align-items: center;
-  padding: 10px;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-.mac-user-profile:hover {
-  background-color: rgba(0, 0, 0, 0.05);
-}
-.mac-avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  margin-right: 10px;
-}
-.mac-username {
-  font-size: 14px;
-  font-weight: 500;
-  color: #1d1d1f;
-  flex: 1;
-}
-.logout-icon {
-  color: #ff3b30; /* 苹果系统级红色 */
-  font-size: 16px;
-}
-
-/*  主内容区：纯白背景，大圆角 */
+/* --- 主内容区 --- */
 .mac-main {
   flex: 1;
   background-color: #ffffff;
   overflow-y: auto;
+  position: relative;
+  transition: all 0.3s ease;
 }
 
 .mac-content {
   padding: 40px 60px;
   max-width: 1200px;
   margin: 0 auto;
+  transition: padding 0.3s ease;
 }
 
-.mac-page-title {
-  font-size: 34px;
-  font-weight: 700;
-  color: #1d1d1f;
-  letter-spacing: -0.5px;
-  margin-bottom: 5px;
-}
-.mac-divider {
-  height: 1px;
-  background-color: rgba(0, 0, 0, 0.08);
-  margin-bottom: 30px;
-}
-
-/*  类似 App Store 推荐位的大卡片 */
-.mac-hero-card {
-  position: relative;
-  height: 320px;
-  border-radius: 18px;
-  background: linear-gradient(135deg, #007aff 0%, #00c6ff 100%); /* 渐变色模拟海报 */
-  color: white;
-  padding: 30px;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  box-shadow: 0 10px 30px rgba(0, 122, 255, 0.3);
-  margin-bottom: 40px;
-  overflow: hidden;
-  transition: transform 0.3s;
-}
-.mac-hero-card:hover {
-  transform: scale(1.01);
-}
-.hero-subtitle {
-  font-size: 13px;
-  font-weight: 600;
-  opacity: 0.8;
-  text-transform: uppercase;
-  margin-bottom: 4px;
-}
-.hero-title {
-  font-size: 28px;
-  font-weight: 700;
-  margin-bottom: 8px;
-}
-.hero-desc {
-  font-size: 15px;
-  opacity: 0.9;
-}
-.hero-button {
+/* --- 学校 Logo 响应式 (放大二倍基础) --- */
+.mac-school-branding {
   position: absolute;
-  right: 30px;
-  bottom: 30px;
-  background: rgba(255, 255, 255, 0.2);
-  backdrop-filter: blur(10px);
-  padding: 8px 20px;
-  border-radius: 20px;
-  font-weight: 600;
-  font-size: 14px;
-  cursor: pointer;
-}
-.hero-button:hover {
-  background: rgba(255, 255, 255, 0.3);
+  top: 40px;
+  right: 60px;
+  z-index: 100;
+  transition: all 0.3s ease;
 }
 
-/*  数据展示小卡片 */
-.mac-section-title {
-  font-size: 22px;
-  font-weight: 600;
-  color: #1d1d1f;
-  margin-bottom: 20px;
+.school-logo {
+  width: 240px; /* 默认放大二倍 */
+  height: auto;
+  border-radius: 12px;
+  background: white;
+  padding: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  transition: transform 0.3s ease;
 }
+
+/* --- 栅格布局响应式 --- */
 .mac-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(3, 1fr); /* 默认三列 */
   gap: 20px;
 }
-.mac-data-card {
-  background: #ffffff;
-  border-radius: 16px;
-  border: 1px solid rgba(0, 0, 0, 0.06);
-  padding: 24px;
-  display: flex;
-  align-items: center;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
-  transition: box-shadow 0.3s;
+
+/* =============================================
+    响应式断点设置
+   ============================================= */
+
+/* 1. 窄屏笔记本/平板 (小于 1200px) */
+@media (max-width: 1200px) {
+  .mac-content {
+    padding: 40px 30px;
+  }
+  .school-logo {
+    width: 180px; /* 稍微缩小 Logo */
+  }
+  .mac-grid {
+    grid-template-columns: repeat(2, 1fr); /* 变为两列 */
+  }
 }
-.mac-data-card:hover {
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+
+/* 2. 平板模式 (小于 1024px) */
+@media (max-width: 1024px) {
+  .mobile-menu-toggle {
+    display: flex;
+  }
+  .mac-sidebar {
+    position: fixed;
+    height: 100vh;
+    left: 0;
+  }
+  .sidebar-hidden {
+    transform: translateX(-100%); /* 隐藏侧边栏 */
+  }
+  .mac-school-branding {
+    right: 30px;
+  }
 }
-.card-icon {
-  width: 50px;
-  height: 50px;
-  border-radius: 12px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  font-size: 24px;
-  margin-right: 16px;
-  color: white;
+
+/* 3. 手机模式 (小于 768px) */
+@media (max-width: 768px) {
+  .mac-content {
+    padding: 80px 20px 40px; /* 顶部留出切换按钮空间 */
+  }
+  .mac-page-title {
+    font-size: 26px;
+  }
+  .mac-school-branding {
+    position: relative; /* 手机端改为流式布局，避免挡住文字 */
+    top: 0;
+    right: 0;
+    margin-bottom: 20px;
+    display: flex;
+    justify-content: center;
+  }
+  .school-logo {
+    width: 160px; /* 手机端再次缩小 */
+  }
+  .mac-grid {
+    grid-template-columns: 1fr; /* 变为一列 */
+  }
+  .mac-hero-card {
+    height: 240px;
+    padding: 20px;
+  }
+  .hero-title {
+    font-size: 20px;
+  }
 }
+
+/* 其他基础样式保持不变 */
+.mac-search-box { margin-bottom: 20px; padding: 0 10px; }
+:deep(.el-input__wrapper) { border-radius: 8px; background-color: rgba(0, 0, 0, 0.05); box-shadow: none !important; }
+.sidebar-title { font-size: 11px; font-weight: 600; color: #86868b; margin: 10px 15px; text-transform: uppercase; }
+.mac-menu-item { display: flex; align-items: center; padding: 8px 12px; margin-bottom: 4px; border-radius: 6px; color: #1d1d1f; cursor: pointer; font-size: 14px; transition: all 0.2s; }
+.mac-menu-item.active { background-color: #007aff; color: white; }
+.mac-menu-item .el-icon { margin-right: 10px; font-size: 18px; }
+.spacer { flex: 1; }
+.mac-user-profile { display: flex; align-items: center; padding: 10px; border-radius: 8px; cursor: pointer; }
+.mac-avatar { width: 32px; height: 32px; border-radius: 50%; margin-right: 10px; }
+.mac-username { font-size: 14px; font-weight: 500; flex: 1; }
+.logout-icon { color: #ff3b30; }
+.mac-divider { height: 1px; background-color: rgba(0, 0, 0, 0.08); margin-bottom: 30px; }
+.mac-hero-card { position: relative; border-radius: 18px; background: linear-gradient(135deg, #007aff 0%, #00c6ff 100%); color: white; display: flex; flex-direction: column; justify-content: flex-end; box-shadow: 0 10px 30px rgba(0, 122, 255, 0.3); margin-bottom: 40px; overflow: hidden; height: 320px; padding: 30px;}
+.hero-subtitle { font-size: 11px; font-weight: 600; opacity: 0.8; }
+.hero-desc { font-size: 14px; opacity: 0.9; }
+.hero-button { position: absolute; right: 20px; bottom: 20px; background: rgba(255, 255, 255, 0.2); backdrop-filter: blur(10px); padding: 6px 15px; border-radius: 20px; font-size: 12px; }
+.mac-section-title { font-size: 20px; font-weight: 600; margin-bottom: 15px; }
+.mac-data-card { background: #ffffff; border-radius: 16px; border: 1px solid rgba(0, 0, 0, 0.06); padding: 20px; display: flex; align-items: center; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03); }
+.card-icon { width: 44px; height: 44px; border-radius: 10px; display: flex; justify-content: center; align-items: center; font-size: 20px; margin-right: 12px; color: white; }
 .card-icon.blue { background-color: #007aff; }
 .card-icon.purple { background-color: #5856d6; }
 .card-icon.green { background-color: #34c759; }
-
-.card-info h3 {
-  font-size: 13px;
-  color: #86868b;
-  font-weight: 500;
-  margin-bottom: 4px;
-}
-.card-info .number {
-  font-size: 24px;
-  font-weight: 700;
-  color: #1d1d1f;
-}
+.card-info h3 { font-size: 12px; color: #86868b; margin-bottom: 2px; }
+.card-info .number { font-size: 20px; font-weight: 700; }
 </style>
