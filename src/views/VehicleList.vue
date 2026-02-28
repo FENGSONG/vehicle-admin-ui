@@ -4,9 +4,11 @@
     <div class="mac-divider"></div>
 
     <div class="mac-header-actions">
-      <el-button type="primary" class="mac-button-blue" icon="Plus" @click="handleAdd">
-        新增车辆
+      <el-button type="primary" class="mac-button-blue" @click="handleAdd">
+        <el-icon><Plus /></el-icon>
+        <span>新增车辆</span>
       </el-button>
+      
       <div class="mac-search-wrapper">
         <el-input
           v-model="queryParams.plateNumber"
@@ -105,15 +107,12 @@
 import { ref, reactive, onMounted } from 'vue'
 import { Location, LocationInformation, Search, Plus } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-// 引入上一轮我们封装的 API，请确保路径正确
 import { selectVehicle, saveVehicle, deleteVehicle, bindVehicle, unbindVehicle } from '@/api/vehicle'
 
-// --- 状态与数据 ---
 const loading = ref(false)
 const vehicleList = ref([])
 const queryParams = reactive({ plateNumber: '' })
 
-// 表单弹窗控制
 const dialogVisible = ref(false)
 const dialogTitle = ref('新增车辆')
 const formRef = ref(null)
@@ -128,20 +127,16 @@ const rules = {
   brand: [{ required: true, message: '品牌不能为空', trigger: 'blur' }]
 }
 
-// 绑定围栏弹窗控制
 const bindVisible = ref(false)
 const currentVehicleId = ref(null)
 const currentVehiclePlate = ref('')
 const selectedFenceId = ref(null)
 
-// --- 核心业务方法 ---
-
-// 1. 获取列表 (调用 select 接口)
 const getList = async () => {
   loading.value = true
   try {
     const res = await selectVehicle(queryParams)
-    vehicleList.value = res.data || [] // 假设后端 JsonResult.ok(list) 返回在 data 中
+    vehicleList.value = res.data || [] 
   } catch (error) {
     console.error(error)
   } finally {
@@ -149,7 +144,6 @@ const getList = async () => {
   }
 }
 
-// 2. 新增/编辑处理 (调用 save 接口)
 const handleAdd = () => {
   dialogTitle.value = '新增车辆'
   Object.assign(formData, { id: null, plateNumber: '', brand: '', model: '' })
@@ -158,7 +152,7 @@ const handleAdd = () => {
 
 const handleEdit = (row) => {
   dialogTitle.value = '编辑车辆'
-  Object.assign(formData, row) // 将当前行数据填充到表单
+  Object.assign(formData, row) 
   dialogVisible.value = true
 }
 
@@ -174,7 +168,6 @@ const submitSave = async () => {
   })
 }
 
-// 3. 删除处理 (调用 delete 接口)
 const handleDelete = (row) => {
   ElMessageBox.confirm(`确定要永久删除车辆【${row.plateNumber}】吗？`, '危险操作', {
     confirmButtonText: '删除',
@@ -188,7 +181,6 @@ const handleDelete = (row) => {
   }).catch(() => {})
 }
 
-// 4. 解绑处理 (调用 unbind 接口)
 const handleUnbind = (row) => {
   ElMessageBox.confirm(`确定将车辆【${row.plateNumber}】移出当前围栏吗？`, '解绑确认', {
     confirmButtonText: '确定解绑',
@@ -201,7 +193,6 @@ const handleUnbind = (row) => {
   }).catch(() => {})
 }
 
-// 5. 绑定处理 (调用 bind 接口)
 const openBindDialog = (row) => {
   currentVehicleId.value = row.id
   currentVehiclePlate.value = row.plateNumber
@@ -216,14 +207,12 @@ const submitBind = async () => {
   getList()
 }
 
-// 初始化加载
 onMounted(() => {
   getList()
 })
 </script>
 
 <style scoped>
-/*  页面整体过渡与布局 */
 .mac-page-container {
   animation: fadeIn 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
   padding-bottom: 40px;
@@ -242,7 +231,6 @@ onMounted(() => {
   margin-bottom: 24px;
 }
 
-/*  顶部工具栏 */
 .mac-header-actions {
   display: flex;
   justify-content: space-between;
@@ -259,7 +247,6 @@ onMounted(() => {
   width: 280px;
 }
 
-/* 覆盖 Element 输入框为苹果圆角 */
 :deep(.el-input__wrapper) {
   border-radius: 8px;
   background-color: #f5f5f7;
@@ -273,19 +260,33 @@ onMounted(() => {
   box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.2) !important;
 }
 
-/*  按钮风格 */
+/*  修改点 2：绝对精准居中按钮结构 */
 .mac-button-blue {
   background-color: #007aff;
   border-color: #007aff;
   border-radius: 8px;
   font-weight: 500;
-  padding: 8px 16px;
+  height: 36px;
+  padding: 0 16px;
   transition: all 0.2s;
 }
 .mac-button-blue:hover {
   background-color: #005bb5;
   transform: scale(0.98);
 }
+
+:deep(.mac-button-blue > span) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+:deep(.mac-button-blue .el-icon) {
+  margin-right: 0 !important; 
+  font-size: 16px;
+}
+
 .mac-button-gray {
   background-color: #e5e5ea;
   border-color: transparent;
@@ -297,7 +298,6 @@ onMounted(() => {
   background-color: #d1d1d6;
 }
 
-/*  表格卡片 */
 .mac-table-card {
   background: #ffffff;
   border-radius: 16px;
@@ -315,7 +315,6 @@ onMounted(() => {
   font-size: 13px;
 }
 
-/*  围栏状态样式 */
 .mac-fence-status {
   display: flex;
   align-items: center;
@@ -324,7 +323,7 @@ onMounted(() => {
   font-weight: 500;
 }
 .mac-fence-status.bound {
-  color: #34c759; /* 苹果绿 */
+  color: #34c759;
   background: rgba(52, 199, 89, 0.1);
   padding: 4px 10px;
   border-radius: 20px;
@@ -336,7 +335,6 @@ onMounted(() => {
 .unbind-btn { margin-left: auto; font-size: 12px; }
 .bind-btn { margin-left: 8px; font-size: 12px; font-weight: 600; }
 
-/*  弹窗 (Dialog) 风格覆盖 */
 :deep(.mac-dialog) {
   border-radius: 16px !important;
   overflow: hidden;
