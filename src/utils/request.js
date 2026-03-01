@@ -32,7 +32,7 @@ request.interceptors.response.use(
     const res = response.data
     
     // 根据你后端的 JsonResult 规范，通常 code 为 200 代表成功
-    if (res.code && res.code !== 200) {
+    if (res.code && res.code !== 2000) {
       // 如果后端返回的 code 不是 200，说明业务报错了（比如密码错误），直接弹出提示
       ElMessage.error(res.message || res.msg || '后端接口返回错误')
       return Promise.reject(new Error(res.message || res.msg || 'Error'))

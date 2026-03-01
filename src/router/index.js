@@ -2,7 +2,8 @@ import { createRouter, createWebHistory } from 'vue-router'
 import Login from '../views/Login.vue'
 import Layout from '../views/Layout.vue'
 import VehicleList from '../views/VehicleList.vue'
-import Dashboard from '../views/Dashboard.vue' // 引入刚建好的看板页面
+import Dashboard from '../views/Dashboard.vue' 
+import GeofenceMap from '@/views/GeofenceMap.vue'// 引入刚建好的看板页面
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -31,7 +32,12 @@ const router = createRouter({
           path: 'vehicle', 
           name: 'vehicle',
           component: VehicleList
-        }
+        },
+        {
+        path: 'geofence', 
+        name: 'GeofenceMap',
+        component: GeofenceMap 
+      }
       ]
     }
   ]

@@ -11,7 +11,7 @@
       
       <div class="mac-search-wrapper">
         <el-input
-          v-model="queryParams.plateNumber"
+          v-model="queryParams.license"
           placeholder="搜索车牌号..."
           prefix-icon="Search"
           class="mac-search-bar"
@@ -25,7 +25,7 @@
 
     <div class="mac-table-card">
       <el-table :data="vehicleList" v-loading="loading" style="width: 100%" :row-style="{ height: '60px' }">
-        <el-table-column prop="plateNumber" label="车牌号" width="150" />
+        <el-table-column prop="license" label="车牌号" width="150" />
         <el-table-column prop="brand" label="车辆品牌" width="120" />
         <el-table-column prop="model" label="车辆型号" width="150" />
         
@@ -61,8 +61,8 @@
       destroy-on-close
     >
       <el-form ref="formRef" :model="formData" :rules="rules" label-width="80px" label-position="left">
-        <el-form-item label="车牌号" prop="plateNumber">
-          <el-input v-model="formData.plateNumber" placeholder="请输入车牌号 (例: 浙A88888)" />
+        <el-form-item label="车牌号" prop="license">
+          <el-input v-model="formData.license" placeholder="请输入车牌号 (例: 京A22323)" />
         </el-form-item>
         <el-form-item label="品牌" prop="brand">
           <el-input v-model="formData.brand" placeholder="请输入车辆品牌 (例: 理想)" />
@@ -86,7 +86,7 @@
       class="mac-dialog"
     >
       <div class="bind-dialog-content">
-        <p class="bind-tip">请为车牌号 <strong>{{ currentVehiclePlate }}</strong> 选择要绑定的地理围栏区域：</p>
+        <p class="bind-tip">请为车牌号 <strong>{{ currentVehicleLicense }}</strong> 选择要绑定的地理围栏区域：</p>
         <el-select v-model="selectedFenceId" placeholder="请选择地理围栏" class="mac-select" style="width: 100%">
           <el-option label="杭州市西湖区总区" :value="1" />
           <el-option label="杭州市余杭区调度点" :value="2" />
@@ -111,25 +111,28 @@ import { selectVehicle, saveVehicle, deleteVehicle, bindVehicle, unbindVehicle }
 
 const loading = ref(false)
 const vehicleList = ref([])
-const queryParams = reactive({ plateNumber: '' })
+//  修改 5：查询参数改为 license
+const queryParams = reactive({ license: '' })
 
 const dialogVisible = ref(false)
 const dialogTitle = ref('新增车辆')
 const formRef = ref(null)
+//  修改 6：表单数据初始化改为 license
 const formData = reactive({
   id: null,
-  plateNumber: '',
+  license: '',
   brand: '',
   model: ''
 })
+//  修改 7：校验规则改为 license
 const rules = {
-  plateNumber: [{ required: true, message: '车牌号不能为空', trigger: 'blur' }],
+  license: [{ required: true, message: '车牌号不能为空', trigger: 'blur' }],
   brand: [{ required: true, message: '品牌不能为空', trigger: 'blur' }]
 }
 
 const bindVisible = ref(false)
 const currentVehicleId = ref(null)
-const currentVehiclePlate = ref('')
+const currentVehicleLicense = ref('')
 const selectedFenceId = ref(null)
 
 const getList = async () => {
@@ -138,7 +141,7 @@ const getList = async () => {
     const res = await selectVehicle(queryParams)
     vehicleList.value = res.data || [] 
   } catch (error) {
-    console.error(error)
+    console.error("请求出错了:", error) 
   } finally {
     loading.value = false
   }
@@ -146,7 +149,7 @@ const getList = async () => {
 
 const handleAdd = () => {
   dialogTitle.value = '新增车辆'
-  Object.assign(formData, { id: null, plateNumber: '', brand: '', model: '' })
+  Object.assign(formData, { id: null, license: '', brand: '', model: '' })
   dialogVisible.value = true
 }
 
@@ -169,7 +172,8 @@ const submitSave = async () => {
 }
 
 const handleDelete = (row) => {
-  ElMessageBox.confirm(`确定要永久删除车辆【${row.plateNumber}】吗？`, '危险操作', {
+  //  修改 8：弹窗提示改为 row.license
+  ElMessageBox.confirm(`确定要永久删除车辆【${row.license}】吗？`, '危险操作', {
     confirmButtonText: '删除',
     cancelButtonText: '取消',
     type: 'error',
@@ -182,7 +186,8 @@ const handleDelete = (row) => {
 }
 
 const handleUnbind = (row) => {
-  ElMessageBox.confirm(`确定将车辆【${row.plateNumber}】移出当前围栏吗？`, '解绑确认', {
+  //  修改 9：弹窗提示改为 row.license
+  ElMessageBox.confirm(`确定将车辆【${row.license}】移出当前围栏吗？`, '解绑确认', {
     confirmButtonText: '确定解绑',
     cancelButtonText: '取消',
     type: 'warning'
@@ -195,7 +200,7 @@ const handleUnbind = (row) => {
 
 const openBindDialog = (row) => {
   currentVehicleId.value = row.id
-  currentVehiclePlate.value = row.plateNumber
+  currentVehicleLicense.value = row.license
   selectedFenceId.value = null
   bindVisible.value = true
 }
@@ -213,6 +218,7 @@ onMounted(() => {
 </script>
 
 <style scoped>
+/* 样式部分保持不变，直接沿用上一版的完美居中方案 */
 .mac-page-container {
   animation: fadeIn 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
   padding-bottom: 40px;
@@ -260,31 +266,35 @@ onMounted(() => {
   box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.2) !important;
 }
 
-/*  修改点 2：绝对精准居中按钮结构 */
 .mac-button-blue {
-  background-color: #007aff;
-  border-color: #007aff;
-  border-radius: 8px;
-  font-weight: 500;
-  height: 36px;
-  padding: 0 16px;
+  background-color: #007aff !important;
+  border-color: #007aff !important;
+  border-radius: 8px !important;
+  font-weight: 500 !important;
+  height: 36px !important;
+  padding: 0 16px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
   transition: all 0.2s;
 }
 .mac-button-blue:hover {
-  background-color: #005bb5;
+  background-color: #005bb5 !important;
   transform: scale(0.98);
 }
 
 :deep(.mac-button-blue > span) {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  line-height: 1 !important;
 }
 
 :deep(.mac-button-blue .el-icon) {
   margin-right: 0 !important; 
-  font-size: 16px;
+  font-size: 16px !important;
+  vertical-align: middle !important;
 }
 
 .mac-button-gray {

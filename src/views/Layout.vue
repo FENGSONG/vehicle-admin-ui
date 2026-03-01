@@ -2,17 +2,12 @@
   <div class="mac-layout">
     <div class="mac-sidebar" :class="{ 'sidebar-hidden': isMobileMenuHidden }">
       <div class="mac-search-box">
-        <el-input
-          v-model="searchQuery"
-          placeholder="搜索"
-          prefix-icon="Search"
-          class="mac-input"
-        />
+        <el-input v-model="searchQuery" placeholder="搜索" prefix-icon="Search" class="mac-input" />
       </div>
 
       <div class="sidebar-title">探索</div>
-      <div 
-        v-for="item in menuItems" 
+      <div
+        v-for="item in menuItems"
         :key="item.path"
         class="mac-menu-item"
         :class="{ active: currentPath === item.path }"
@@ -22,9 +17,12 @@
         <span>{{ item.title }}</span>
       </div>
 
-      <div class="spacer"></div> 
+      <div class="spacer"></div>
       <div class="mac-user-profile" @click="handleLogout">
-        <img src="https://cube.elemecdn.com/3/7c/3ea6beec64369c2642b92c6726f1epng.png" class="mac-avatar" />
+        <img
+          src="https://cube.elemecdn.com/3/7c/3ea6beec64369c2642b92c6726f1epng.png"
+          class="mac-avatar"
+        />
         <span class="mac-username">管理员</span>
         <el-icon class="logout-icon"><SwitchButton /></el-icon>
       </div>
@@ -53,7 +51,18 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { Search, DataLine, Van, User, SwitchButton, Expand, Fold } from '@element-plus/icons-vue'
+//  核心修改：把所有的 Element Plus 图标全部合并到这一行，去掉重复的 Van
+import {
+  Search,
+  DataLine,
+  Van,
+  User,
+  SwitchButton,
+  Expand,
+  Fold,
+  Menu,
+  MapLocation,
+} from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 const router = useRouter()
@@ -81,7 +90,8 @@ onUnmounted(() => {
 const menuItems = [
   { title: '数据大盘', icon: DataLine, path: '/layout/dashboard' },
   { title: '车辆管理', icon: Van, path: '/layout/vehicle' },
-  { title: '用户管理', icon: User, path: '/layout/user' }
+  { title: '用户管理', icon: User, path: '/layout/user' },
+  { title: '地理围栏', icon: User, path: '/layout/geofence' },
 ]
 
 const handleMenuClick = (item) => {
@@ -102,29 +112,33 @@ const handleLogout = () => {
     confirmButtonText: '退出',
     cancelButtonText: '取消',
     type: 'warning',
-    center: true
-  }).then(() => {
-    ElMessage.success('已安全退出')
-    router.push('/login')
-  }).catch(() => {})
+    center: true,
+  })
+    .then(() => {
+      ElMessage.success('已安全退出')
+      router.push('/login')
+    })
+    .catch(() => {})
 }
 </script>
 
 <style scoped>
 .mac-layout {
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, Helvetica, Arial,
+    sans-serif;
   display: flex;
   height: 100vh;
-  margin: -8px; 
-  background-color: #f5f5f7; 
+  margin: -8px;
+  background-color: #f5f5f7;
   overflow: hidden;
 }
 
 /* --- 响应式侧边栏 --- */
 .mac-sidebar {
   width: 260px;
-  background-color: rgba(235, 235, 240, 0.75); 
-  backdrop-filter: blur(25px); 
+  background-color: rgba(235, 235, 240, 0.75);
+  backdrop-filter: blur(25px);
   -webkit-backdrop-filter: blur(25px);
   border-right: 1px solid rgba(0, 0, 0, 0.05);
   display: flex;
@@ -143,7 +157,7 @@ const handleLogout = () => {
   background: white;
   padding: 8px;
   border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   cursor: pointer;
 }
 
@@ -171,7 +185,7 @@ const handleLogout = () => {
 }
 
 .school-logo {
-  width: 240px; 
+  width: 240px;
   height: auto;
   border-radius: 12px;
   background: white;
@@ -183,7 +197,9 @@ const handleLogout = () => {
 /*  新增：路由切换时的淡入淡出动画 */
 .fade-enter-active,
 .fade-leave-active {
-  transition: opacity 0.3s ease, transform 0.3s ease;
+  transition:
+    opacity 0.3s ease,
+    transform 0.3s ease;
 }
 .fade-enter-from {
   opacity: 0;
@@ -195,33 +211,106 @@ const handleLogout = () => {
 }
 
 @media (max-width: 1200px) {
-  .mac-content { padding: 40px 30px; }
-  .school-logo { width: 180px; }
+  .mac-content {
+    padding: 40px 30px;
+  }
+  .school-logo {
+    width: 180px;
+  }
 }
 
 @media (max-width: 1024px) {
-  .mobile-menu-toggle { display: flex; }
-  .mac-sidebar { position: fixed; height: 100vh; left: 0; }
-  .sidebar-hidden { transform: translateX(-100%); }
-  .mac-school-branding { right: 30px; }
+  .mobile-menu-toggle {
+    display: flex;
+  }
+  .mac-sidebar {
+    position: fixed;
+    height: 100vh;
+    left: 0;
+  }
+  .sidebar-hidden {
+    transform: translateX(-100%);
+  }
+  .mac-school-branding {
+    right: 30px;
+  }
 }
 
 @media (max-width: 768px) {
-  .mac-content { padding: 80px 20px 40px; }
-  .mac-school-branding { position: relative; top: 0; right: 0; margin-bottom: 20px; display: flex; justify-content: center; }
-  .school-logo { width: 160px; }
+  .mac-content {
+    padding: 80px 20px 40px;
+  }
+  .mac-school-branding {
+    position: relative;
+    top: 0;
+    right: 0;
+    margin-bottom: 20px;
+    display: flex;
+    justify-content: center;
+  }
+  .school-logo {
+    width: 160px;
+  }
 }
 
 /* 基础样式保留 */
-.mac-search-box { margin-bottom: 20px; padding: 0 10px; }
-:deep(.el-input__wrapper) { border-radius: 8px; background-color: rgba(0, 0, 0, 0.05); box-shadow: none !important; }
-.sidebar-title { font-size: 11px; font-weight: 600; color: #86868b; margin: 10px 15px; text-transform: uppercase; }
-.mac-menu-item { display: flex; align-items: center; padding: 8px 12px; margin-bottom: 4px; border-radius: 6px; color: #1d1d1f; cursor: pointer; font-size: 14px; transition: all 0.2s; }
-.mac-menu-item.active { background-color: #007aff; color: white; }
-.mac-menu-item .el-icon { margin-right: 10px; font-size: 18px; }
-.spacer { flex: 1; }
-.mac-user-profile { display: flex; align-items: center; padding: 10px; border-radius: 8px; cursor: pointer; }
-.mac-avatar { width: 32px; height: 32px; border-radius: 50%; margin-right: 10px; }
-.mac-username { font-size: 14px; font-weight: 500; flex: 1; }
-.logout-icon { color: #ff3b30; }
+.mac-search-box {
+  margin-bottom: 20px;
+  padding: 0 10px;
+}
+:deep(.el-input__wrapper) {
+  border-radius: 8px;
+  background-color: rgba(0, 0, 0, 0.05);
+  box-shadow: none !important;
+}
+.sidebar-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: #86868b;
+  margin: 10px 15px;
+  text-transform: uppercase;
+}
+.mac-menu-item {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  margin-bottom: 4px;
+  border-radius: 6px;
+  color: #1d1d1f;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+.mac-menu-item.active {
+  background-color: #007aff;
+  color: white;
+}
+.mac-menu-item .el-icon {
+  margin-right: 10px;
+  font-size: 18px;
+}
+.spacer {
+  flex: 1;
+}
+.mac-user-profile {
+  display: flex;
+  align-items: center;
+  padding: 10px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.mac-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  margin-right: 10px;
+}
+.mac-username {
+  font-size: 14px;
+  font-weight: 500;
+  flex: 1;
+}
+.logout-icon {
+  color: #ff3b30;
+}
 </style>
