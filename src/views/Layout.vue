@@ -185,13 +185,14 @@ const handleLogout = () => {
 }
 
 .school-logo {
-  width: 240px;
+  width: 180px;
   height: auto;
   border-radius: 12px;
   background: white;
   padding: 6px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
   transition: transform 0.3s ease;
+  margin-right: 40px;
 }
 
 /*  新增：路由切换时的淡入淡出动画 */

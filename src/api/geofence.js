@@ -1,20 +1,34 @@
-// src/api/geofence.js
 import request from '@/utils/request'
 
-// 新增地理围栏
+// 1. 保存/新增地理围栏
 export function saveGeofence(data) {
   return request({
-    url: '/v1/geofence/save', //  这里要对应你后端 Controller 的路径
+    url: '/v1/geofence/save',
     method: 'post',
     data: data,
   })
 }
 
-// 如果你顺手把查询列表也写了，可以留着下面这个备用
+// 2. 查询地理围栏列表 (对应后端的 @GetMapping("select"))
 export function getGeofenceList(params) {
   return request({
     url: '/v1/geofence/select',
     method: 'get',
     params: params,
+  })
+}
+
+// 3. 删除地理围栏 (对应后端的 @PostMapping("delete/{id}"))
+export function deleteGeofence(id) {
+  return request({
+    url: `/v1/geofence/delete/${id}`,
+    method: 'post',
+  })
+}
+// 4. 修改地理围栏状态 (对应后端的 @PostMapping("update/{geofenceId}/{status}"))
+export function updateGeofenceStatus(geofenceId, status) {
+  return request({
+    url: `/v1/geofence/update/${geofenceId}/${status}`,
+    method: 'post',
   })
 }
