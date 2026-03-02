@@ -200,7 +200,7 @@ const tableList = ref([])
 
 const total = ref(0)
 const currentPage = ref(1)
-const pageSize = ref(10)
+const pageSize = ref(8)
 
 const queryParams = reactive({
   username: '',

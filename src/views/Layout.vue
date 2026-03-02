@@ -51,7 +51,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-//  核心修改：把所有的 Element Plus 图标全部合并到这一行，去掉重复的 Van
+//  核心修改：新增了 Document 图标用于用车申请
 import {
   Search,
   DataLine,
@@ -62,15 +62,15 @@ import {
   Fold,
   Menu,
   MapLocation,
+  Document,
 } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 const router = useRouter()
-const route = useRoute() // 引入 route 来获取当前路径
+const route = useRoute()
 const searchQuery = ref('')
 const isMobileMenuHidden = ref(false)
 
-//  计算属性：实时获取当前路由路径，解决刷新后高亮丢失的问题
 const currentPath = computed(() => route.path)
 
 const checkWidth = () => {
@@ -86,12 +86,13 @@ onUnmounted(() => {
   window.removeEventListener('resize', checkWidth)
 })
 
-// 菜单数据
+// 🍎 菜单数据核心修改：加入了用车申请，并修复了地理围栏的图标
 const menuItems = [
   { title: '数据大盘', icon: DataLine, path: '/layout/dashboard' },
   { title: '车辆管理', icon: Van, path: '/layout/vehicle' },
+  { title: '地理围栏', icon: MapLocation, path: '/layout/geofence' },
   { title: '用户管理', icon: User, path: '/layout/user' },
-  { title: '地理围栏', icon: User, path: '/layout/geofence' },
+  { title: '用车申请', icon: Document, path: '/layout/application' }, // <-- 新增的选项
 ]
 
 const handleMenuClick = (item) => {
@@ -195,7 +196,6 @@ const handleLogout = () => {
   margin-right: 40px;
 }
 
-/*  新增：路由切换时的淡入淡出动画 */
 .fade-enter-active,
 .fade-leave-active {
   transition:
@@ -254,7 +254,6 @@ const handleLogout = () => {
   }
 }
 
-/* 基础样式保留 */
 .mac-search-box {
   margin-bottom: 20px;
   padding: 0 10px;

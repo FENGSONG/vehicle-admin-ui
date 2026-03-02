@@ -4,7 +4,8 @@ import Layout from '../views/Layout.vue'
 import VehicleList from '../views/VehicleList.vue'
 import Dashboard from '../views/Dashboard.vue'
 import GeofenceMap from '@/views/GeofenceMap.vue' // 引入刚建好的看板页面
-import UserList from '@/views/UserList.vue' // 🍎 新增：引入用户大盘页面
+import UserList from '@/views/UserList.vue'
+import ApplicationList from '@/views/ApplicationList.vue' // 🍎 新增：引入用户大盘页面
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -46,6 +47,7 @@ const router = createRouter({
           name: 'UserList',
           component: UserList,
         },
+        { path: 'application', name: 'ApplicationList', component: ApplicationList },
       ],
     },
   ],
