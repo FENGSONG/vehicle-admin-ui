@@ -3,9 +3,11 @@ import Login from '../views/Login.vue'
 import Layout from '../views/Layout.vue'
 import VehicleList from '../views/VehicleList.vue'
 import Dashboard from '../views/Dashboard.vue'
-import GeofenceMap from '@/views/GeofenceMap.vue' // 引入刚建好的看板页面
+import GeofenceMap from '@/views/GeofenceMap.vue'
 import UserList from '@/views/UserList.vue'
-import ApplicationList from '@/views/ApplicationList.vue' // 🍎 新增：引入用户大盘页面
+import ApplicationList from '@/views/ApplicationList.vue'
+// 🍎 新增：引入审批待办页面 (请确保 views 目录下有这个文件)
+import AuditList from '@/views/AuditList.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -41,13 +43,24 @@ const router = createRouter({
           name: 'GeofenceMap',
           component: GeofenceMap,
         },
-        // 🍎 新增：用户模块路由配置
+        // 🍎 用户模块路由配置
         {
           path: 'user',
           name: 'UserList',
           component: UserList,
         },
-        { path: 'application', name: 'ApplicationList', component: ApplicationList },
+        {
+          path: 'application',
+          name: 'ApplicationList',
+          component: ApplicationList,
+        },
+        // 🍎 新增：审批待办路由配置
+        // 访问路径将是：/layout/audit
+        {
+          path: 'audit',
+          name: 'AuditList',
+          component: AuditList,
+        },
       ],
     },
   ],

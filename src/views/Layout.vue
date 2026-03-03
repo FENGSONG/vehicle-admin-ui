@@ -51,7 +51,6 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-//  核心修改：新增了 Document 图标用于用车申请
 import {
   Search,
   DataLine,
@@ -63,6 +62,7 @@ import {
   Menu,
   MapLocation,
   Document,
+  Stamp, // 🍎 新增：引入审批专用的印章图标
 } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
@@ -86,13 +86,13 @@ onUnmounted(() => {
   window.removeEventListener('resize', checkWidth)
 })
 
-// 🍎 菜单数据核心修改：加入了用车申请，并修复了地理围栏的图标
 const menuItems = [
   { title: '数据大盘', icon: DataLine, path: '/layout/dashboard' },
   { title: '车辆管理', icon: Van, path: '/layout/vehicle' },
   { title: '地理围栏', icon: MapLocation, path: '/layout/geofence' },
   { title: '用户管理', icon: User, path: '/layout/user' },
-  { title: '用车申请', icon: Document, path: '/layout/application' }, // <-- 新增的选项
+  { title: '用车申请', icon: Document, path: '/layout/application' },
+  { title: '审批待办', icon: Stamp, path: '/layout/audit' }, // 🍎 新增：审批待办的菜单入口
 ]
 
 const handleMenuClick = (item) => {
