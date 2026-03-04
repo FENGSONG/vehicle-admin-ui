@@ -7,7 +7,7 @@
 
       <div class="sidebar-title">探索</div>
       <div
-        v-for="item in menuItems"
+        v-for="item in visibleMenuItems"
         :key="item.path"
         class="mac-menu-item"
         :class="{ active: currentPath === item.path }"
@@ -23,7 +23,7 @@
           src="https://cube.elemecdn.com/3/7c/3ea6beec64369c2642b92c6726f1epng.png"
           class="mac-avatar"
         />
-        <span class="mac-username">管理员</span>
+        <span class="mac-username">{{ currentUserName }}</span>
         <el-icon class="logout-icon"><SwitchButton /></el-icon>
       </div>
     </div>
@@ -38,10 +38,8 @@
           <img src="@/assets/school-logo.png" alt="学校Logo" class="school-logo" />
         </div>
 
-        <router-view v-slot="{ Component }">
-          <transition name="fade" mode="out-in">
-            <component :is="Component" />
-          </transition>
+        <router-view v-slot="{ Component, route }">
+          <component :is="Component" :key="route.path" />
         </router-view>
       </div>
     </div>
@@ -62,7 +60,7 @@ import {
   Menu,
   MapLocation,
   Document,
-  Stamp, // 🍎 新增：引入审批专用的印章图标
+  Stamp,
 } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
@@ -73,11 +71,29 @@ const isMobileMenuHidden = ref(false)
 
 const currentPath = computed(() => route.path)
 
+const currentUserLevel = ref('10')
+const currentUserName = ref('未登录')
+
 const checkWidth = () => {
   isMobileMenuHidden.value = window.innerWidth < 1024
 }
 
 onMounted(() => {
+  const userInfoStr = localStorage.getItem('userInfo')
+  if (userInfoStr) {
+    try {
+      const userInfo = JSON.parse(userInfoStr)
+      if (userInfo.level) {
+        currentUserLevel.value = String(userInfo.level)
+      }
+      if (userInfo.username) {
+        currentUserName.value = userInfo.username
+      }
+    } catch (error) {
+      console.error('解析本地用户信息失败', error)
+    }
+  }
+
   checkWidth()
   window.addEventListener('resize', checkWidth)
 })
@@ -86,14 +102,23 @@ onUnmounted(() => {
   window.removeEventListener('resize', checkWidth)
 })
 
-const menuItems = [
-  { title: '数据大盘', icon: DataLine, path: '/layout/dashboard' },
-  { title: '车辆管理', icon: Van, path: '/layout/vehicle' },
-  { title: '地理围栏', icon: MapLocation, path: '/layout/geofence' },
-  { title: '用户管理', icon: User, path: '/layout/user' },
-  { title: '用车申请', icon: Document, path: '/layout/application' },
-  { title: '审批待办', icon: Stamp, path: '/layout/audit' }, // 🍎 新增：审批待办的菜单入口
+const allMenuItems = [
+  { title: '数据大盘', icon: DataLine, path: '/layout/dashboard', allowedRoles: ['40'] },
+  { title: '车辆管理', icon: Van, path: '/layout/vehicle', allowedRoles: ['40'] },
+  { title: '地理围栏', icon: MapLocation, path: '/layout/geofence', allowedRoles: ['40'] },
+  { title: '用户管理', icon: User, path: '/layout/user', allowedRoles: ['40'] },
+  {
+    title: '用车申请',
+    icon: Document,
+    path: '/layout/application',
+    allowedRoles: ['10', '20', '30', '40'],
+  },
+  { title: '审批待办', icon: Stamp, path: '/layout/audit', allowedRoles: ['20', '30', '40'] },
 ]
+
+const visibleMenuItems = computed(() => {
+  return allMenuItems.filter((item) => item.allowedRoles.includes(currentUserLevel.value))
+})
 
 const handleMenuClick = (item) => {
   router.push(item.path)
@@ -116,6 +141,9 @@ const handleLogout = () => {
     center: true,
   })
     .then(() => {
+      localStorage.removeItem('userInfo')
+      localStorage.removeItem('token')
+
       ElMessage.success('已安全退出')
       router.push('/login')
     })
@@ -135,7 +163,6 @@ const handleLogout = () => {
   overflow: hidden;
 }
 
-/* --- 响应式侧边栏 --- */
 .mac-sidebar {
   width: 260px;
   background-color: rgba(235, 235, 240, 0.75);
@@ -194,21 +221,6 @@ const handleLogout = () => {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
   transition: transform 0.3s ease;
   margin-right: 40px;
-}
-
-.fade-enter-active,
-.fade-leave-active {
-  transition:
-    opacity 0.3s ease,
-    transform 0.3s ease;
-}
-.fade-enter-from {
-  opacity: 0;
-  transform: translateY(10px);
-}
-.fade-leave-to {
-  opacity: 0;
-  transform: translateY(-10px);
 }
 
 @media (max-width: 1200px) {

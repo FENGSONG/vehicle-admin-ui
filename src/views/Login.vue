@@ -2,8 +2,8 @@
   <div class="mac-login-container">
     <div class="liquid-bg-container">
       <div class="liquid-blob blob-blue"></div>
-      <div class="liquid-blob blob-white"></div> 
-      <div class="liquid-blob blob-skyblue"></div> 
+      <div class="liquid-blob blob-white"></div>
+      <div class="liquid-blob blob-skyblue"></div>
     </div>
 
     <div class="mac-login-card">
@@ -14,35 +14,29 @@
         <h1 class="mac-title">北华智行</h1>
         <p class="mac-subtitle">北华大学车辆智能调度与管理平台</p>
       </div>
-      
+
       <el-form :model="loginForm" @keyup.enter="handleLogin" class="mac-form">
         <el-form-item>
-          <el-input 
-            v-model="loginForm.username" 
-            placeholder="管理员账号" 
-            class="mac-input"
-          />
+          <el-input v-model="loginForm.username" placeholder="管理员账号" class="mac-input" />
         </el-form-item>
-        
+
         <el-form-item>
-          <el-input 
-            v-model="loginForm.password" 
-            type="password" 
-            placeholder="密码" 
-            show-password 
+          <el-input
+            v-model="loginForm.password"
+            type="password"
+            placeholder="密码"
+            show-password
             class="mac-input"
           />
         </el-form-item>
-        
+
         <el-button type="primary" class="mac-button" @click="handleLogin" :loading="loading" round>
           <span v-if="!loading">登录系统</span>
           <span v-else>正在验证...</span>
         </el-button>
       </el-form>
 
-      <div class="mac-footer">
-        遇到问题？ <a href="#">联系技术支持 ↗</a>
-      </div>
+      <div class="mac-footer">遇到问题？ <a href="#">联系技术支持 ↗</a></div>
     </div>
   </div>
 </template>
@@ -58,7 +52,7 @@ const loading = ref(false)
 
 const loginForm = reactive({
   username: '',
-  password: ''
+  password: '',
 })
 
 const handleLogin = async () => {
@@ -66,38 +60,41 @@ const handleLogin = async () => {
     ElMessage({
       message: '请填写完整的登录信息',
       type: 'warning',
-      customClass: 'mac-message'
+      customClass: 'mac-message',
     })
     return
   }
-  
+
   loading.value = true
-  
+
   try {
     const response = await axios.post('http://localhost:8080/v1/user/login', {
       username: loginForm.username,
-      password: loginForm.password
+      password: loginForm.password,
     })
 
     if (response.data.code === 2000) {
+      // 🍎 核心新增：把后端返回的完整的用户信息（id, level, username等）存到浏览器本地！
+      localStorage.setItem('userInfo', JSON.stringify(response.data.data))
+
       ElMessage({
         message: `欢迎回来，${loginForm.username}`,
         type: 'success',
-        customClass: 'mac-message'
+        customClass: 'mac-message',
       })
       router.push('/layout')
     } else {
       ElMessage({
         message: response.data.message || '账号或密码错误',
         type: 'error',
-        customClass: 'mac-message'
+        customClass: 'mac-message',
       })
     }
   } catch (error) {
     ElMessage({
       message: '服务器连接失败，请稍后再试',
       type: 'error',
-      customClass: 'mac-message'
+      customClass: 'mac-message',
     })
   } finally {
     loading.value = false
@@ -108,7 +105,9 @@ const handleLogin = async () => {
 <style scoped>
 /*  整体容器与字体 */
 .mac-login-container {
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, Helvetica, Arial,
+    sans-serif;
   height: 100vh;
   width: 100vw;
   margin: -8px;
@@ -128,7 +127,7 @@ const handleLogin = async () => {
   width: 100%;
   height: 100%;
   z-index: 0;
-  filter: blur(120px); 
+  filter: blur(120px);
   will-change: transform, filter;
   opacity: 0.9;
 }
@@ -137,47 +136,83 @@ const handleLogin = async () => {
 .liquid-blob {
   position: absolute;
   border-radius: 50%;
-  mix-blend-mode: normal; 
+  mix-blend-mode: normal;
   animation-timing-function: cubic-bezier(0.45, 0.05, 0.55, 0.95);
   animation-iteration-count: infinite;
 }
 
 .blob-blue {
-  top: -20%; left: -20%; width: 70vw; height: 70vw;
-  background: rgba(0, 122, 255, 0.4); 
-  animation-name: moveBlue; animation-duration: 25s;
+  top: -20%;
+  left: -20%;
+  width: 70vw;
+  height: 70vw;
+  background: rgba(0, 122, 255, 0.4);
+  animation-name: moveBlue;
+  animation-duration: 25s;
 }
 
 .blob-white {
-  bottom: -30%; right: -30%; width: 85vw; height: 85vw;
-  background: rgba(255, 255, 255, 0.9); 
-  animation-name: moveWhite; animation-duration: 30s; animation-delay: -5s;
+  bottom: -30%;
+  right: -30%;
+  width: 85vw;
+  height: 85vw;
+  background: rgba(255, 255, 255, 0.9);
+  animation-name: moveWhite;
+  animation-duration: 30s;
+  animation-delay: -5s;
 }
 
 .blob-skyblue {
-  top: 30%; left: 40%; width: 60vw; height: 60vw;
-  background: rgba(90, 200, 250, 0.5); 
-  animation-name: moveSkyblue; animation-duration: 35s; animation-delay: -10s;
+  top: 30%;
+  left: 40%;
+  width: 60vw;
+  height: 60vw;
+  background: rgba(90, 200, 250, 0.5);
+  animation-name: moveSkyblue;
+  animation-duration: 35s;
+  animation-delay: -10s;
 }
 
 @keyframes moveBlue {
-  0% { transform: translate(0, 0) rotate(0deg) scale(1); }
-  33% { transform: translate(30vw, 20vh) rotate(120deg) scale(1.1); }
-  66% { transform: translate(-10vw, 40vh) rotate(240deg) scale(0.9); }
-  100% { transform: translate(0, 0) rotate(360deg) scale(1); }
+  0% {
+    transform: translate(0, 0) rotate(0deg) scale(1);
+  }
+  33% {
+    transform: translate(30vw, 20vh) rotate(120deg) scale(1.1);
+  }
+  66% {
+    transform: translate(-10vw, 40vh) rotate(240deg) scale(0.9);
+  }
+  100% {
+    transform: translate(0, 0) rotate(360deg) scale(1);
+  }
 }
 
 @keyframes moveWhite {
-  0% { transform: translate(0, 0) rotate(0deg) scale(1); }
-  33% { transform: translate(-30vw, -30vh) rotate(-90deg) scale(1.15); }
-  66% { transform: translate(20vw, -10vh) rotate(-180deg) scale(0.95); }
-  100% { transform: translate(0, 0) rotate(-360deg) scale(1); }
+  0% {
+    transform: translate(0, 0) rotate(0deg) scale(1);
+  }
+  33% {
+    transform: translate(-30vw, -30vh) rotate(-90deg) scale(1.15);
+  }
+  66% {
+    transform: translate(20vw, -10vh) rotate(-180deg) scale(0.95);
+  }
+  100% {
+    transform: translate(0, 0) rotate(-360deg) scale(1);
+  }
 }
 
 @keyframes moveSkyblue {
-  0% { transform: translate(0, 0) scale(1); }
-  50% { transform: translate(-20vw, 20vh) scale(1.2); }
-  100% { transform: translate(0, 0) scale(1); }
+  0% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(-20vw, 20vh) scale(1.2);
+  }
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
 }
 
 /* ---------------------------------- */
@@ -198,40 +233,53 @@ const handleLogin = async () => {
 }
 
 @keyframes cardPopup {
-  from { opacity: 0; transform: scale(0.95) translateY(20px); }
-  to { opacity: 1; transform: scale(1) translateY(0); }
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
 }
 
-.mac-header { margin-bottom: 30px; }
+.mac-header {
+  margin-bottom: 30px;
+}
 
-/* 🎓 校徽图片容器专门优化 */
-/* 🎓 校徽毛玻璃盒子（放大两倍） */
 .mac-icon-box {
-  width: 136px; /* 原来是 68px */
-  height: 136px; /* 原来是 68px */
+  width: 136px;
+  height: 136px;
   background: rgba(255, 255, 255, 0.5);
-  border-radius: 32px; /* 圆角也要跟着放大，保持苹果的Squircle曲线 */
-  display: flex; align-items: center; justify-content: center;
-  margin: 0 auto 20px; /* 底部间距稍微加大一点 */
-  box-shadow: 0 15px 30px rgba(0, 0, 0, 0.08); /* 阴影也跟着等比增强 */
+  border-radius: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 20px;
+  box-shadow: 0 15px 30px rgba(0, 0, 0, 0.08);
   border: 1px solid rgba(255, 255, 255, 0.9);
 }
 
-/* 🎓 校徽图片本身（放大两倍） */
-.mac-logo-img { 
-  width: 100px; /* 原来是 50px */
-  height: 100px; /* 原来是 50px */
-  object-fit: contain; 
+.mac-logo-img {
+  width: 100px;
+  height: 100px;
+  object-fit: contain;
 }
 
 .mac-title {
-  font-size: 26px; font-weight: 700; color: #1d1d1f; margin: 0 0 6px; letter-spacing: 1px;
+  font-size: 26px;
+  font-weight: 700;
+  color: #1d1d1f;
+  margin: 0 0 6px;
+  letter-spacing: 1px;
 }
 .mac-subtitle {
-  font-size: 14px; color: #86868b; margin: 0; font-weight: 500;
+  font-size: 14px;
+  color: #86868b;
+  margin: 0;
+  font-weight: 500;
 }
 
-/* 输入框微调 */
 :deep(.el-input__wrapper) {
   background-color: rgba(255, 255, 255, 0.7) !important;
   border-radius: 14px !important;
@@ -246,12 +294,18 @@ const handleLogin = async () => {
   box-shadow: 0 0 0 4px rgba(0, 122, 255, 0.15) !important;
 }
 :deep(.el-input__inner) {
-  height: 36px; font-size: 16px; color: #1d1d1f; text-align: center;
+  height: 36px;
+  font-size: 16px;
+  color: #1d1d1f;
+  text-align: center;
 }
 
-/* 按钮微调 */
 .mac-button {
-  width: 100%; height: 52px; font-size: 17px; font-weight: 600; margin-top: 15px;
+  width: 100%;
+  height: 52px;
+  font-size: 17px;
+  font-weight: 600;
+  margin-top: 15px;
   background: linear-gradient(to right, #007aff, #5ac8fa) !important;
   border: none !important;
   box-shadow: 0 8px 20px rgba(0, 122, 255, 0.25);
@@ -263,9 +317,12 @@ const handleLogin = async () => {
 }
 
 .mac-footer {
-  margin-top: 30px; font-size: 13px; color: #86868b;
+  margin-top: 30px;
+  font-size: 13px;
+  color: #86868b;
 }
 .mac-footer a {
-  color: #007aff; text-decoration: none;
+  color: #007aff;
+  text-decoration: none;
 }
 </style>

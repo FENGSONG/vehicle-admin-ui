@@ -44,19 +44,28 @@
         <el-table-column prop="endTime" label="预计结束时间" width="160" align="center" />
 
         <el-table-column label="审批状态" width="120" align="center">
-          <template #default>
-            <el-tag type="warning" size="small" effect="light">待我审核</el-tag>
+          <template #default="{ row }">
+            <el-tag
+              :type="getStatusType(row.auditStatus || row.status)"
+              size="small"
+              effect="light"
+            >
+              {{ getStatusText(row.auditStatus || row.status) }}
+            </el-tag>
           </template>
         </el-table-column>
 
         <el-table-column label="审批操作" width="200" fixed="right" align="center">
           <template #default="{ row }">
-            <el-button link type="success" @click="handlePass(row)">
-              <el-icon><Check /></el-icon> 同意
-            </el-button>
-            <el-button link type="danger" @click="openRejectDialog(row)">
-              <el-icon><Close /></el-icon> 驳回
-            </el-button>
+            <template v-if="(row.auditStatus || row.status) == '10'">
+              <el-button link type="success" @click="handlePass(row)">
+                <el-icon><Check /></el-icon> 同意
+              </el-button>
+              <el-button link type="danger" @click="openRejectDialog(row)">
+                <el-icon><Close /></el-icon> 驳回
+              </el-button>
+            </template>
+            <span v-else style="color: #909399; font-size: 13px">已处理</span>
           </template>
         </el-table-column>
       </el-table>
@@ -100,7 +109,6 @@
 import { ref, reactive, onMounted } from 'vue'
 import { Search, Check, Close } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-// ⚠️ 你需要在 api/audit.js 中定义这两个接口请求
 import { selectAuditList, updateAuditStatus } from '@/api/audit'
 
 const loading = ref(false)
@@ -109,30 +117,51 @@ const total = ref(0)
 const currentPage = ref(1)
 const pageSize = ref(8)
 
-// 查询参数，比如查状态为 "待我审核" 的数据（假设字典值是 10）
 const queryParams = reactive({
   keyword: '',
-  auditStatus: '10', // 替换为你后端 AuditStatusEnum.MY_PENDING 的真实数值
+  auditStatus: '10',
 })
 
 const rejectDialogVisible = ref(false)
 const submitLoading = ref(false)
 const currentAuditId = ref(null)
 const currentApplicationId = ref(null)
-const currentAuditSort = ref(null) // 🍎 新增：用于存储当前的层级排序
+const currentAuditSort = ref(null)
 const rejectReason = ref('')
+
+// 🍎 新增：状态字典翻译
+const getStatusText = (status) => {
+  const val = String(status)
+  if (val === '10') return '待我审核'
+  if (val === '20') return '待他人审核'
+  if (val === '30') return '已通过'
+  if (val === '40') return '已驳回'
+  return '未知'
+}
+
+const getStatusType = (status) => {
+  const val = String(status)
+  if (val === '10') return 'warning'
+  if (val === '30') return 'success'
+  if (val === '40') return 'danger'
+  return 'info'
+}
 
 onMounted(() => {
   fetchList()
 })
 
-// 获取审批列表
 const fetchList = async () => {
   loading.value = true
   try {
     const res = await selectAuditList(queryParams)
-    tableList.value = res.data || []
-    total.value = tableList.value.length // 如果后端分页了，这里要取 res.data.total
+    let allData = res.data || []
+
+    // 🍎 修复 3：前端安全兜底过滤！强制只显示“待我审核”的数据，把已处理的数据从这个页面过滤掉
+    allData = allData.filter((item) => String(item.auditStatus || item.status) === '10')
+
+    tableList.value = allData
+    total.value = tableList.value.length
   } catch (error) {
     console.error('获取审批列表失败', error)
   } finally {
@@ -145,7 +174,6 @@ const handleCurrentChange = (val) => {
   fetchList()
 }
 
-// ================= 核心操作：同意 =================
 const handlePass = (row) => {
   ElMessageBox.confirm(`确认同意该用车申请吗？`, '审批确认', {
     confirmButtonText: '同意通过',
@@ -158,11 +186,15 @@ const handlePass = (row) => {
         await updateAuditStatus({
           id: row.id,
           applicationId: row.applicationId,
-          auditStatus: '30', // 代表通过
-          auditSort: row.auditSort, // 🍎 核心修复：把当前的审批层级传给后端
+          auditStatus: '30',
+          auditSort: row.auditSort,
         })
         ElMessage.success('审批通过！系统正在流转...')
-        fetchList() // 刷新列表，这条数据就会消失了
+
+        // 延迟一下刷新，确保后端数据库已完全提交
+        setTimeout(() => {
+          fetchList()
+        }, 300)
       } catch (error) {
         console.error('审批失败', error)
       }
@@ -170,11 +202,10 @@ const handlePass = (row) => {
     .catch(() => {})
 }
 
-// ================= 核心操作：驳回 =================
 const openRejectDialog = (row) => {
   currentAuditId.value = row.id
   currentApplicationId.value = row.applicationId
-  currentAuditSort.value = row.auditSort // 🍎 新增：保存当前行的审批排序
+  currentAuditSort.value = row.auditSort
   rejectReason.value = ''
   rejectDialogVisible.value = true
 }
@@ -189,13 +220,16 @@ const submitReject = async () => {
     await updateAuditStatus({
       id: currentAuditId.value,
       applicationId: currentApplicationId.value,
-      auditStatus: '40', // 代表驳回
-      auditSort: currentAuditSort.value, // 🍎 核心修复：把当前的审批层级传给后端
+      auditStatus: '40',
+      auditSort: currentAuditSort.value,
       rejectReason: rejectReason.value,
     })
     ElMessage.success('已驳回该申请')
     rejectDialogVisible.value = false
-    fetchList()
+
+    setTimeout(() => {
+      fetchList()
+    }, 300)
   } catch (error) {
     console.error('驳回失败', error)
   } finally {
@@ -205,7 +239,7 @@ const submitReject = async () => {
 </script>
 
 <style scoped>
-/* 这里复用你系统一贯的 Mac 风格 CSS */
+/* 这里复用你系统一贯的 Mac 风格 CSS 保持不变 */
 .mac-page-container {
   height: calc(100vh - 100px) !important;
   display: flex;
@@ -251,7 +285,7 @@ const submitReject = async () => {
 
 .table-header-actions {
   display: flex;
-  justify-content: flex-end; /* 审批页通常不需要新增按钮，搜索靠右 */
+  justify-content: flex-end;
   align-items: center;
   margin-bottom: 20px;
   flex-shrink: 0;
