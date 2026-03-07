@@ -74,15 +74,30 @@ const handleLogin = async () => {
     })
 
     if (response.data.code === 2000) {
-      // 🍎 核心新增：把后端返回的完整的用户信息（id, level, username等）存到浏览器本地！
-      localStorage.setItem('userInfo', JSON.stringify(response.data.data))
+      const userInfo = response.data.data
+
+      // 把完整的用户信息存入本地
+      localStorage.setItem('userInfo', JSON.stringify(userInfo))
 
       ElMessage({
-        message: `欢迎回来，${loginForm.username}`,
+        message: `欢迎回来，${userInfo.username}`,
         type: 'success',
         customClass: 'mac-message',
       })
-      router.push('/layout')
+
+      // 🍎 核心修改：根据用户的 level 智能跳转到不同的首页
+      const level = String(userInfo.level).trim()
+
+      if (['40', '50'].includes(level)) {
+        // 总监(40)、总裁(50) 关注全盘数据，跳转到数据大盘
+        router.push('/layout/dashboard')
+      } else if (['20', '30'].includes(level)) {
+        // 主管(20)、经理(30) 主要工作是审批，跳转到审批待办
+        router.push('/layout/audit')
+      } else {
+        // 基层员工(10) 和其他未知职级，默认跳转到自己的用车申请页面
+        router.push('/layout/application')
+      }
     } else {
       ElMessage({
         message: response.data.message || '账号或密码错误',

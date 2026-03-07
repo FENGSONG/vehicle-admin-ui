@@ -50,17 +50,16 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import {
-  Search,
   DataLine,
   Van,
   User,
   SwitchButton,
   Expand,
   Fold,
-  Menu,
   MapLocation,
   Document,
   Stamp,
+  Search, // 补上遗漏的 Search 图标
 } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
@@ -71,7 +70,7 @@ const isMobileMenuHidden = ref(false)
 
 const currentPath = computed(() => route.path)
 
-const currentUserLevel = ref('10')
+const currentUserLevel = ref('10') // 默认基层员工
 const currentUserName = ref('未登录')
 
 const checkWidth = () => {
@@ -102,18 +101,51 @@ onUnmounted(() => {
   window.removeEventListener('resize', checkWidth)
 })
 
+// 🍎 核心修改：重新分配菜单权限
+// 假设 '99' 代表全能的车管调度员/系统管理员
 const allMenuItems = [
-  { title: '数据大盘', icon: DataLine, path: '/layout/dashboard', allowedRoles: ['40'] },
-  { title: '车辆管理', icon: Van, path: '/layout/vehicle', allowedRoles: ['40'] },
-  { title: '地理围栏', icon: MapLocation, path: '/layout/geofence', allowedRoles: ['40'] },
-  { title: '用户管理', icon: User, path: '/layout/user', allowedRoles: ['40'] },
+  {
+    title: '数据大盘',
+    icon: DataLine,
+    path: '/layout/dashboard',
+    // 所有人都能看数据大盘
+    allowedRoles: ['10', '20', '30', '40', '50', '99'],
+  },
+  {
+    title: '车辆管理',
+    icon: Van,
+    path: '/layout/vehicle',
+    // 只有车管调度员能看
+    allowedRoles: ['99'],
+  },
+  {
+    title: '地理围栏',
+    icon: MapLocation,
+    path: '/layout/geofence',
+    // 只有车管调度员能看
+    allowedRoles: ['99'],
+  },
+  {
+    title: '用户管理',
+    icon: User,
+    path: '/layout/user',
+    // 只有车管调度员能看 (或者你想让总裁也能看，可以加上 '50')
+    allowedRoles: ['99'],
+  },
   {
     title: '用车申请',
     icon: Document,
     path: '/layout/application',
-    allowedRoles: ['10', '20', '30', '40'],
+    // 所有人都能发起申请
+    allowedRoles: ['10', '20', '30', '40', '50', '99'],
   },
-  { title: '审批待办', icon: Stamp, path: '/layout/audit', allowedRoles: ['20', '30', '40'] },
+  {
+    title: '审批待办',
+    icon: Stamp,
+    path: '/layout/audit',
+    // 各级领导和车管能看，基层员工(10)不能看
+    allowedRoles: ['20', '30', '40', '50', '99'],
+  },
 ]
 
 const visibleMenuItems = computed(() => {
@@ -152,6 +184,7 @@ const handleLogout = () => {
 </script>
 
 <style scoped>
+/* 保持你原本的样式完全不变 */
 .mac-layout {
   font-family:
     -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, Helvetica, Arial,

@@ -21,10 +21,10 @@
             prefix-icon="Search"
             clearable
             class="mac-search-input"
-            @keyup.enter="fetchList"
-            @clear="fetchList"
+            @keyup.enter="handleSearch"
+            @clear="handleSearch"
           />
-          <el-button class="mac-button-gray" @click="fetchList">搜索</el-button>
+          <el-button class="mac-button-gray" @click="handleSearch">搜索</el-button>
         </div>
       </div>
 
@@ -40,7 +40,7 @@
         <el-table-column prop="phone" label="联系电话" min-width="130" />
         <el-table-column prop="email" label="邮箱" min-width="160" show-overflow-tooltip />
 
-        <el-table-column label="职级" width="100">
+        <el-table-column label="职级" width="120" align="center">
           <template #default="{ row }">
             <el-tag :type="getLevelTagType(row.level)" size="small" effect="light">
               {{ getLevelText(row.level) }}
@@ -48,7 +48,7 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="性别" width="80">
+        <el-table-column label="性别" width="80" align="center">
           <template #default="{ row }">
             <el-tag :type="row.gender == '1' ? '' : 'danger'" size="small">
               {{ row.gender == '1' ? '男' : row.gender == '0' ? '女' : '未知' }}
@@ -56,7 +56,7 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="账号状态" width="100">
+        <el-table-column label="账号状态" width="100" align="center">
           <template #default="{ row }">
             <el-switch
               v-model="row.status"
@@ -128,10 +128,12 @@
           <el-col :span="12">
             <el-form-item label="职级 (level)" prop="level">
               <el-select v-model="userForm.level" placeholder="请选择职级" style="width: 100%">
-                <el-option label="实习生" value="0" />
-                <el-option label="普通员工" value="1" />
-                <el-option label="主管" value="2" />
-                <el-option label="经理" value="3" />
+                <el-option label="基层员工" value="10" />
+                <el-option label="项目主管" value="20" />
+                <el-option label="部门经理" value="30" />
+                <el-option label="中心总监" value="40" />
+                <el-option label="总裁/CEO" value="50" />
+                <el-option label="车管调度员" value="99" />
               </el-select>
             </el-form-item>
           </el-col>
@@ -245,31 +247,33 @@ const rules = {
   status: [{ required: true, message: '状态不能为空', trigger: 'change' }],
 }
 
-// 🍎 职级字典映射方法 (增强了健壮性，无论后端返回数字还是字符串都能匹配)
+// 🍎 映射方法中补上车管调度员 (99)
 const getLevelText = (level) => {
   if (level === null || level === undefined) return '未知'
 
-  // 强制转换为字符串进行比对
   const val = String(level).trim()
   const map = {
-    10: '实习生',
-    20: '普通员工',
-    30: '主管',
-    40: '经理',
+    10: '基层员工',
+    20: '项目主管',
+    30: '部门经理',
+    40: '中心总监',
+    50: '总裁/CEO',
+    99: '车管调度员',
   }
-  // 如果字典里有，就显示字典对应的汉字；如果没有，则原样显示数字
   return map[val] || val
 }
 
-// 🍎 职级标签颜色映射
+// 🍎 标签颜色中为 99 分配高亮的品牌色 (primary)，和普通职级区分开
 const getLevelTagType = (level) => {
   if (level === null || level === undefined) return ''
   const val = String(level).trim()
   const map = {
-    10: 'info', // 灰色
-    20: '', // 默认蓝色
-    30: 'warning', // 橙色
-    40: 'success', // 绿色
+    10: 'info',
+    20: '',
+    30: 'success',
+    40: 'warning',
+    50: 'danger',
+    99: '', // 默认是 primary 蓝色，显得比较专业
   }
   return map[val] || ''
 }
@@ -279,6 +283,11 @@ onMounted(() => {
   loadLeaders()
 })
 
+const handleSearch = () => {
+  currentPage.value = 1
+  fetchList()
+}
+
 const fetchList = async () => {
   loading.value = true
   try {
@@ -287,14 +296,12 @@ const fetchList = async () => {
 
     allData.value = dataList.map((item) => {
       item.status = item.status ? item.status.toString() : '1'
-      item.gender = item.gender ? item.gender.toString() : '1'
-      // 保证 level 回显时是字符串类型
-      item.level = item.level !== null ? item.level.toString() : ''
+      item.gender = item.gender !== null && item.gender !== undefined ? item.gender.toString() : '1'
+      item.level = item.level !== null && item.level !== undefined ? item.level.toString() : ''
       return item
     })
 
     total.value = allData.value.length
-    currentPage.value = 1
     updatePageData()
   } catch (error) {
     console.error('获取用户列表失败', error)
@@ -304,6 +311,11 @@ const fetchList = async () => {
 }
 
 const updatePageData = () => {
+  const maxPage = Math.ceil(total.value / pageSize.value) || 1
+  if (currentPage.value > maxPage) {
+    currentPage.value = maxPage
+  }
+
   const start = (currentPage.value - 1) * pageSize.value
   const end = start + pageSize.value
   tableList.value = allData.value.slice(start, end)
@@ -365,6 +377,7 @@ const handleEdit = (row) => {
     status: row.status,
   })
   dialogVisible.value = true
+  if (formRef.value) formRef.value.clearValidate()
 }
 
 const submitForm = () => {
@@ -411,10 +424,6 @@ const handleDelete = (row) => {
     .then(async () => {
       await deleteUser(row.id)
       ElMessage.success('删除成功！')
-
-      if (tableList.value.length === 1 && currentPage.value > 1) {
-        currentPage.value -= 1
-      }
       fetchList()
       loadLeaders()
     })

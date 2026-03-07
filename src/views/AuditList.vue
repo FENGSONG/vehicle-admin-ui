@@ -1,7 +1,9 @@
 <template>
   <div class="mac-page-container">
     <div class="page-header-container">
-      <h1 class="mac-page-title">我的审批待办</h1>
+      <h1 class="mac-page-title">
+        {{ currentUserLevel === '99' ? '全局审批监控' : '我的审批待办' }}
+      </h1>
     </div>
 
     <div class="mac-divider"></div>
@@ -15,10 +17,10 @@
             prefix-icon="Search"
             clearable
             class="mac-search-input"
-            @keyup.enter="fetchList"
-            @clear="fetchList"
+            @keyup.enter="handleSearch"
+            @clear="handleSearch"
           />
-          <el-button class="mac-button-gray" @click="fetchList">搜索</el-button>
+          <el-button class="mac-button-gray" @click="handleSearch">搜索</el-button>
         </div>
       </div>
 
@@ -112,14 +114,19 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { selectAuditList, updateAuditStatus } from '@/api/audit'
 
 const loading = ref(false)
+const allData = ref([])
 const tableList = ref([])
 const total = ref(0)
 const currentPage = ref(1)
 const pageSize = ref(8)
 
+// 🍎 新增：用于记录当前登录人的职级，控制页面标题展示
+const currentUserLevel = ref('')
+
 const queryParams = reactive({
   keyword: '',
   auditStatus: '10',
+  auditUserId: null,
 })
 
 const rejectDialogVisible = ref(false)
@@ -129,7 +136,6 @@ const currentApplicationId = ref(null)
 const currentAuditSort = ref(null)
 const rejectReason = ref('')
 
-// 🍎 新增：状态字典翻译
 const getStatusText = (status) => {
   const val = String(status)
   if (val === '10') return '待我审核'
@@ -148,20 +154,41 @@ const getStatusType = (status) => {
 }
 
 onMounted(() => {
+  const userInfoStr = localStorage.getItem('userInfo')
+  if (userInfoStr) {
+    try {
+      const userInfo = JSON.parse(userInfoStr)
+      currentUserLevel.value = String(userInfo.level)
+
+      // 🍎 核心修改：如果是车管(99)，不传 auditUserId，让他看到所有人的待办；
+      // 其他领导，只传自己的 ID，看自己的待办。
+      if (currentUserLevel.value !== '99') {
+        queryParams.auditUserId = userInfo.id
+      }
+    } catch (e) {
+      console.error('解析用户信息失败', e)
+    }
+  }
+
   fetchList()
 })
+
+const handleSearch = () => {
+  currentPage.value = 1
+  fetchList()
+}
 
 const fetchList = async () => {
   loading.value = true
   try {
     const res = await selectAuditList(queryParams)
-    let allData = res.data || []
+    let rawData = res.data || []
 
-    // 🍎 修复 3：前端安全兜底过滤！强制只显示“待我审核”的数据，把已处理的数据从这个页面过滤掉
-    allData = allData.filter((item) => String(item.auditStatus || item.status) === '10')
+    // 前端安全兜底过滤！强制只显示状态为“10（待审核）”的数据
+    allData.value = rawData.filter((item) => String(item.auditStatus || item.status) === '10')
 
-    tableList.value = allData
-    total.value = tableList.value.length
+    total.value = allData.value.length
+    updatePageData()
   } catch (error) {
     console.error('获取审批列表失败', error)
   } finally {
@@ -169,9 +196,19 @@ const fetchList = async () => {
   }
 }
 
+const updatePageData = () => {
+  const maxPage = Math.ceil(total.value / pageSize.value) || 1
+  if (currentPage.value > maxPage) {
+    currentPage.value = maxPage
+  }
+  const start = (currentPage.value - 1) * pageSize.value
+  const end = start + pageSize.value
+  tableList.value = allData.value.slice(start, end)
+}
+
 const handleCurrentChange = (val) => {
   currentPage.value = val
-  fetchList()
+  updatePageData()
 }
 
 const handlePass = (row) => {
@@ -191,7 +228,6 @@ const handlePass = (row) => {
         })
         ElMessage.success('审批通过！系统正在流转...')
 
-        // 延迟一下刷新，确保后端数据库已完全提交
         setTimeout(() => {
           fetchList()
         }, 300)
@@ -239,7 +275,6 @@ const submitReject = async () => {
 </script>
 
 <style scoped>
-/* 这里复用你系统一贯的 Mac 风格 CSS 保持不变 */
 .mac-page-container {
   height: calc(100vh - 100px) !important;
   display: flex;
