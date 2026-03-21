@@ -12,6 +12,18 @@ export function saveApplication(data) {
   })
 }
 
+// 1.1 上传驾照图片
+export function uploadLicense(fileFormData) {
+  return request({
+    url: '/v1/file/upload',
+    method: 'post',
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+    data: fileFormData,
+  })
+}
+
 // 2. 查询申请单列表
 export function selectApplication(params) {
   return request({

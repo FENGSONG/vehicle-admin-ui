@@ -187,10 +187,16 @@
                     :auto-upload="false"
                     :on-change="handleAvatarChange"
                   >
-                    <img v-if="appForm.imgUrl" :src="appForm.imgUrl" class="avatar" />
+                    <img v-if="licensePreviewUrl" :src="licensePreviewUrl" class="avatar" />
                     <el-icon v-else class="avatar-uploader-icon"><Plus /></el-icon>
                   </el-upload>
                   <div class="upload-tip">只能上传jpg/png文件，且不超过500kb</div>
+                  <div v-if="uploadingLicense" class="upload-status status-uploading">
+                    驾照上传中，请稍候...
+                  </div>
+                  <div v-else-if="licenseUploadMessage" class="upload-status" :class="licenseUploadClass">
+                    {{ licenseUploadMessage }}
+                  </div>
                 </div>
               </el-form-item>
             </el-col>
@@ -356,10 +362,7 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import {
-  Search,
   Document,
-  Location,
-  Check,
   User,
   Clock,
   Van,
@@ -369,6 +372,7 @@ import {
 import {
   selectApplication,
   saveApplication,
+  uploadLicense,
   cancelApplication,
   distributeVehicle,
   backVehicle,
@@ -412,10 +416,17 @@ const appForm = reactive({
   reason: '',
   remark: '',
 })
+
+const licensePreviewUrl = ref('')
+const uploadingLicense = ref(false)
+const licenseUploadMessage = ref('')
+const licenseUploadClass = ref('')
+
 const rules = {
   timeRange: [{ required: true, message: '请选择使用时间', trigger: 'change' }],
   departureAddr: [{ required: true, message: '请填写出发地', trigger: 'blur' }],
   destinationAddr: [{ required: true, message: '请填写目的地', trigger: 'blur' }],
+  imgUrl: [{ required: true, message: '请上传驾照照片', trigger: 'change' }],
   reason: [{ required: true, message: '请填写用车事由', trigger: 'blur' }],
 }
 
@@ -498,11 +509,83 @@ const handleCurrentChange = (val) => {
   updatePageData()
 }
 
+const resetLicenseUploadState = () => {
+  if (licensePreviewUrl.value && licensePreviewUrl.value.startsWith('blob:')) {
+    URL.revokeObjectURL(licensePreviewUrl.value)
+  }
+  licensePreviewUrl.value = ''
+  uploadingLicense.value = false
+  licenseUploadMessage.value = ''
+  licenseUploadClass.value = ''
+}
+
+const validateLicenseFile = (file) => {
+  const fileName = String(file?.name || '').toLowerCase()
+  const isImage = ['image/jpeg', 'image/png'].includes(file?.type) || /\.(jpg|jpeg|png)$/.test(fileName)
+  if (!isImage) {
+    ElMessage.warning('仅支持 jpg/png 格式图片')
+    return false
+  }
+  const maxSize = 500 * 1024
+  if (file.size > maxSize) {
+    ElMessage.warning('图片大小不能超过 500KB')
+    return false
+  }
+  return true
+}
+
+const handleAvatarChange = async (uploadFile) => {
+  const rawFile = uploadFile?.raw
+  if (!rawFile) {
+    ElMessage.warning('未获取到图片文件，请重试')
+    return
+  }
+  if (!validateLicenseFile(rawFile)) {
+    return
+  }
+
+  if (licensePreviewUrl.value && licensePreviewUrl.value.startsWith('blob:')) {
+    URL.revokeObjectURL(licensePreviewUrl.value)
+  }
+  licensePreviewUrl.value = URL.createObjectURL(rawFile)
+  appForm.imgUrl = ''
+  licenseUploadClass.value = ''
+  licenseUploadMessage.value = ''
+  uploadingLicense.value = true
+
+  const formData = new FormData()
+  formData.append('file', rawFile)
+
+  try {
+    const res = await uploadLicense(formData)
+    const savedPath = String(res?.data || '').trim()
+    if (!savedPath) {
+      throw new Error('服务器未返回图片路径')
+    }
+    appForm.imgUrl = savedPath
+    licenseUploadClass.value = 'status-success'
+    licenseUploadMessage.value = `上传成功：${rawFile.name}`
+    ElMessage.success('驾照上传成功')
+    if (formRef.value) {
+      formRef.value.validateField('imgUrl', () => {})
+    }
+  } catch (error) {
+    appForm.imgUrl = ''
+    licenseUploadClass.value = 'status-error'
+    licenseUploadMessage.value = '上传失败，请重新选择图片'
+    ElMessage.error(error?.message || '驾照上传失败')
+  } finally {
+    uploadingLicense.value = false
+  }
+}
+
 const handleAdd = () => {
+  const usernameCache = appForm.username
+  resetLicenseUploadState()
   Object.assign(appForm, {
     id: null,
     userId: currentUserId.value,
-    username: appForm.username,
+    username: usernameCache,
     timeRange: [],
     startTime: '',
     endTime: '',
@@ -518,6 +601,10 @@ const handleAdd = () => {
 
 const submitForm = () => {
   if (!formRef.value) return
+  if (uploadingLicense.value) {
+    ElMessage.warning('驾照仍在上传中，请稍候再提交')
+    return
+  }
   formRef.value.validate(async (valid) => {
     if (valid) {
       submitLoading.value = true
@@ -527,11 +614,11 @@ const submitForm = () => {
           appForm.endTime = appForm.timeRange[1]
         }
         const submitData = { ...appForm }
-        if (!submitData.imgUrl) submitData.imgUrl = 'default-driver-license.png'
 
         await saveApplication(submitData)
         ElMessage.success('申请提交成功！审批流已启动。')
         dialogVisible.value = false
+        resetLicenseUploadState()
         if (activeTab.value === 'all') {
           activeTab.value = 'mine'
           handleTabChange('mine')
@@ -769,6 +856,66 @@ const getTimelineNodeColor = (status) => {
   border-color: transparent;
   color: #1d1d1f;
   border-radius: 8px;
+}
+
+.upload-container {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+:deep(.avatar-uploader .el-upload) {
+  width: 140px;
+  height: 140px;
+  border: 1px dashed #dcdfe6;
+  border-radius: 10px;
+  cursor: pointer;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #fafafa;
+  transition: border-color 0.2s ease;
+}
+
+:deep(.avatar-uploader .el-upload:hover) {
+  border-color: #409eff;
+}
+
+.avatar {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.avatar-uploader-icon {
+  font-size: 28px;
+  color: #8c939d;
+}
+
+.upload-tip {
+  color: #909399;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.upload-status {
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.status-uploading {
+  color: #e6a23c;
+}
+
+.status-success {
+  color: #67c23a;
+}
+
+.status-error {
+  color: #f56c6c;
 }
 
 :deep(.el-table) {
