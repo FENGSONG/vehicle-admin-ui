@@ -9,14 +9,29 @@ const request = axios.create({
   timeout: 10000 // 请求超时时间设置为 10 秒
 })
 
+const getStoredToken = () => {
+  const token = String(localStorage.getItem('token') || '').trim()
+  if (token) return token
+  try {
+    const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
+    return String(userInfo.token || '').trim()
+  } catch (e) {
+    return ''
+  }
+}
+
+const clearLoginStorage = () => {
+  localStorage.removeItem('token')
+  localStorage.removeItem('userInfo')
+}
+
 // 2. 请求拦截器 (Request Interceptor)
 request.interceptors.request.use(
   config => {
-    // 💡 这里是未来存放 Token 的地方
-    // const token = localStorage.getItem('token')
-    // if (token) {
-    //   config.headers['Authorization'] = token
-    // }
+    const token = getStoredToken()
+    if (token) {
+      config.headers['Authorization'] = token
+    }
     return config
   },
   error => {
@@ -33,6 +48,14 @@ request.interceptors.response.use(
     
     // 根据你后端的 JsonResult 规范，通常 code 为 200 代表成功
     if (res.code && res.code !== 2000) {
+      if (res.code === 3008 || res.code === 401) {
+        clearLoginStorage()
+        ElMessage.error('登录状态无效，请重新登录')
+        if (window.location.pathname !== '/login') {
+          window.location.href = '/login'
+        }
+        return Promise.reject(new Error(res.message || '登录状态无效'))
+      }
       // 如果后端返回的 code 不是 200，说明业务报错了（比如密码错误），直接弹出提示
       ElMessage.error(res.message || res.msg || '后端接口返回错误')
       return Promise.reject(new Error(res.message || res.msg || 'Error'))

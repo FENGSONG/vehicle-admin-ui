@@ -47,6 +47,10 @@ import { ElMessage } from 'element-plus'
 import axios from 'axios'
 import { useRouter } from 'vue-router'
 
+defineOptions({
+  name: 'UserLoginPage',
+})
+
 const router = useRouter()
 const loading = ref(false)
 
@@ -75,9 +79,19 @@ const handleLogin = async () => {
 
     if (response.data.code === 2000) {
       const userInfo = response.data.data
+      const token = String(userInfo?.token || '').trim()
+      if (!token) {
+        ElMessage({
+          message: '登录成功但未返回token，请检查后端登录接口',
+          type: 'error',
+          customClass: 'mac-message',
+        })
+        return
+      }
 
       // 把完整的用户信息存入本地
       localStorage.setItem('userInfo', JSON.stringify(userInfo))
+      localStorage.setItem('token', token)
 
       ElMessage({
         message: `欢迎回来，${userInfo.username}`,
@@ -106,6 +120,7 @@ const handleLogin = async () => {
       })
     }
   } catch (error) {
+    console.error('登录失败:', error)
     ElMessage({
       message: '服务器连接失败，请稍后再试',
       type: 'error',
