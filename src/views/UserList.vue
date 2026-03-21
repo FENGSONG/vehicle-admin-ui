@@ -192,7 +192,7 @@
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
-import { Search, Plus } from '@element-plus/icons-vue'
+import { Plus } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { selectUser, saveUser, deleteUser, updateStatus, resetPassword } from '@/api/user'
 
@@ -325,7 +325,7 @@ const loadLeaders = async () => {
   try {
     const res = await selectUser({})
     leaderOptions.value = res.data || []
-  } catch (error) {
+  } catch {
     console.warn('获取领导列表失败')
   }
 }
@@ -341,7 +341,7 @@ const handleStatusChange = async (row) => {
     ElMessage.success(`用户【${row.username}】状态已更新！`)
     const itemInAllData = allData.value.find((item) => item.id === row.id)
     if (itemInAllData) itemInAllData.status = row.status
-  } catch (error) {
+  } catch {
     row.status = row.status === '1' ? '0' : '1'
   }
 }

@@ -15,7 +15,7 @@ const getStoredToken = () => {
   try {
     const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
     return String(userInfo.token || '').trim()
-  } catch (e) {
+  } catch {
     return ''
   }
 }
@@ -45,6 +45,9 @@ request.interceptors.response.use(
   response => {
     // response.data 就是你后端 JsonResult 返回的完整 JSON 对象
     const res = response.data
+    const ignoreBusinessCodes = Array.isArray(response?.config?.ignoreBusinessCodes)
+      ? response.config.ignoreBusinessCodes.map(item => Number(item))
+      : []
     
     // 根据你后端的 JsonResult 规范，通常 code 为 200 代表成功
     if (res.code && res.code !== 2000) {
@@ -57,7 +60,10 @@ request.interceptors.response.use(
         return Promise.reject(new Error(res.message || '登录状态无效'))
       }
       // 如果后端返回的 code 不是 200，说明业务报错了（比如密码错误），直接弹出提示
-      ElMessage.error(res.message || res.msg || '后端接口返回错误')
+      const shouldIgnoreMessage = ignoreBusinessCodes.includes(Number(res.code))
+      if (!shouldIgnoreMessage) {
+        ElMessage.error(res.message || res.msg || '后端接口返回错误')
+      }
       return Promise.reject(new Error(res.message || res.msg || 'Error'))
     } else {
       // 如果成功，直接把数据放行

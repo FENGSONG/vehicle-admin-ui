@@ -35,7 +35,11 @@
         <el-table-column prop="license" label="车牌号" min-width="120" />
         <el-table-column prop="brand" label="车辆品牌" min-width="100" />
         <el-table-column prop="model" label="车辆型号" min-width="120" />
-        <el-table-column prop="color" label="颜色" min-width="80" align="center" />
+        <el-table-column label="颜色" min-width="100" align="center">
+          <template #default="{ row }">
+            {{ getColorText(row.color) }}
+          </template>
+        </el-table-column>
 
         <el-table-column label="当前状态" min-width="100" align="center">
           <template #default="{ row }">
@@ -113,7 +117,14 @@
               <el-input v-model="formData.code" placeholder="请输入17位车辆识别代码" />
             </el-form-item>
             <el-form-item label="车辆颜色" prop="color">
-              <el-input v-model="formData.color" placeholder="例: 珍珠白 / 幻彩黑" />
+              <el-select v-model="formData.color" placeholder="请选择车辆颜色" style="width: 100%">
+                <el-option
+                  v-for="item in colorOptions"
+                  :key="`color-${item.value}`"
+                  :label="item.label"
+                  :value="item.value"
+                />
+              </el-select>
             </el-form-item>
             <el-form-item label="当前里程数 (km)" prop="kilometers">
               <el-input v-model="formData.kilometers" placeholder="请输入行驶里程" type="number" />
@@ -123,10 +134,12 @@
           <el-col :span="12">
             <el-form-item label="车辆类型" prop="type">
               <el-select v-model="formData.type" placeholder="请选择车辆类型" style="width: 100%">
-                <el-option label="轿车" value="10" />
-                <el-option label="SUV" value="20" />
-                <el-option label="商务MPV" value="30" />
-                <el-option label="客车" value="40" />
+                <el-option
+                  v-for="item in typeOptions"
+                  :key="`type-${item.value}`"
+                  :label="item.label"
+                  :value="item.value"
+                />
               </el-select>
             </el-form-item>
             <el-form-item label="电池/动力类型" prop="batteryType">
@@ -135,10 +148,12 @@
                 placeholder="请选择动力类型"
                 style="width: 100%"
               >
-                <el-option label="燃油车" value="10" />
-                <el-option label="纯电动 (三元锂)" value="20" />
-                <el-option label="纯电动 (磷酸铁锂)" value="30" />
-                <el-option label="插电混动" value="40" />
+                <el-option
+                  v-for="item in batteryTypeOptions"
+                  :key="`battery-${item.value}`"
+                  :label="item.label"
+                  :value="item.value"
+                />
               </el-select>
             </el-form-item>
             <el-form-item label="排量/功率" prop="displacement">
@@ -187,9 +202,12 @@
           class="mac-select"
           style="width: 100%"
         >
-          <el-option label="杭州市西湖区总区" :value="1" />
-          <el-option label="杭州市余杭区调度点" :value="2" />
-          <el-option label="滨江研发中心测试区" :value="3" />
+          <el-option
+            v-for="item in geofenceOptions"
+            :key="`fence-${item.id}`"
+            :label="item.name"
+            :value="item.id"
+          />
         </el-select>
       </div>
       <template #footer>
@@ -209,9 +227,11 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
-import { Location, LocationInformation, Search, Plus } from '@element-plus/icons-vue'
+import { ref, reactive, computed, onMounted } from 'vue'
+import { Location, LocationInformation, Plus } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { getGeofenceList } from '@/api/geofence'
+import { selectDictOptionByCode } from '@/api/dictoption'
 import {
   selectVehicle,
   saveVehicle,
@@ -256,7 +276,7 @@ const rules = {
   brand: [{ required: true, message: '车辆品牌不能为空', trigger: 'blur' }],
   model: [{ required: true, message: '车辆型号不能为空', trigger: 'blur' }],
   code: [{ required: true, message: '车辆识别码(VIN)不能为空', trigger: 'blur' }],
-  color: [{ required: true, message: '车辆颜色不能为空', trigger: 'blur' }],
+  color: [{ required: true, message: '车辆颜色不能为空', trigger: 'change' }],
   kilometers: [{ required: true, message: '车辆里程数不能为空', trigger: 'blur' }],
   type: [{ required: true, message: '请选择车辆类型', trigger: 'change' }],
   batteryType: [{ required: true, message: '请选择动力类型', trigger: 'change' }],
@@ -270,17 +290,117 @@ const bindVisible = ref(false)
 const currentVehicleId = ref(null)
 const currentVehicleLicense = ref('')
 const selectedFenceId = ref(null)
+const geofenceOptions = ref([])
+
+const colorOptions = ref([])
+const typeOptions = ref([])
+const batteryTypeOptions = ref([])
+
+const DICT_FALLBACK = Object.freeze({
+  color: [
+    { label: '白', value: '10' },
+    { label: '灰', value: '20' },
+    { label: '黑', value: '30' },
+    { label: '银', value: '40' },
+    { label: '红', value: '50' },
+    { label: '绿', value: '60' },
+  ],
+  type: [
+    { label: '轿车', value: '10' },
+    { label: '客车', value: '20' },
+    { label: '货车', value: '30' },
+    { label: '挂车', value: '40' },
+  ],
+  battery: [
+    { label: '铅酸蓄电池', value: '10' },
+    { label: '镍氢电池', value: '20' },
+    { label: '钠硫电池', value: '30' },
+    { label: '二次锂电池', value: '40' },
+    { label: '空气电池', value: '50' },
+    { label: '三元锂电池', value: '60' },
+    { label: '碱性燃料电池', value: '70' },
+  ],
+})
+
+const toKey = (value) => String(value == null ? '' : value).trim()
+const toOptionList = (list, fallback) => {
+  const normalized = Array.isArray(list)
+    ? list
+        .map((item) => ({
+          label: String(item?.label || '').trim(),
+          value: toKey(item?.value),
+          sort: Number(item?.sort || 0),
+        }))
+        .filter((item) => item.label && item.value)
+        .sort((a, b) => a.sort - b.sort)
+    : []
+  return normalized.length ? normalized : fallback
+}
+
+const buildLabelMap = (list) => {
+  const map = {}
+  ;(list || []).forEach((item) => {
+    const key = toKey(item?.value)
+    if (!key) return
+    map[key] = String(item?.label || '').trim()
+  })
+  return map
+}
+
+const colorLabelMap = computed(() => buildLabelMap(colorOptions.value))
+
+const getColorText = (value) => {
+  const key = toKey(value)
+  return colorLabelMap.value[key] || (key || '--')
+}
 
 const handleSearch = () => {
   currentPage.value = 1
   getList()
 }
 
+const loadDictOptions = async () => {
+  const [colorRes, batteryRes, typeRes] = await Promise.allSettled([
+    selectDictOptionByCode('101'),
+    selectDictOptionByCode('102'),
+    selectDictOptionByCode('103'),
+  ])
+
+  colorOptions.value = colorRes.status === 'fulfilled'
+    ? toOptionList(colorRes.value?.data, DICT_FALLBACK.color)
+    : DICT_FALLBACK.color
+  batteryTypeOptions.value = batteryRes.status === 'fulfilled'
+    ? toOptionList(batteryRes.value?.data, DICT_FALLBACK.battery)
+    : DICT_FALLBACK.battery
+  typeOptions.value = typeRes.status === 'fulfilled'
+    ? toOptionList(typeRes.value?.data, DICT_FALLBACK.type)
+    : DICT_FALLBACK.type
+}
+
+const loadGeofenceOptions = async () => {
+  try {
+    const res = await getGeofenceList({ status: '1' })
+    const list = (res.data || [])
+      .filter((item) => item && item.id != null)
+      .map((item) => ({ id: item.id, name: item.name || `围栏${item.id}` }))
+    geofenceOptions.value = list
+  } catch (error) {
+    console.error('获取围栏选项失败', error)
+    geofenceOptions.value = []
+  }
+}
+
 const getList = async () => {
   loading.value = true
   try {
     const res = await selectVehicle(queryParams)
-    allVehicleData.value = res.data || []
+    allVehicleData.value = (res.data || []).map((item) => ({
+      ...item,
+      status: toKey(item.status || '1'),
+      type: toKey(item.type),
+      batteryType: toKey(item.batteryType),
+      color: toKey(item.color),
+    }))
     total.value = allVehicleData.value.length
     updatePageData()
   } catch (error) {
@@ -329,7 +449,13 @@ const handleAdd = () => {
 
 const handleEdit = (row) => {
   dialogTitle.value = '编辑车辆档案'
-  Object.assign(formData, row)
+  Object.assign(formData, {
+    ...row,
+    status: toKey(row.status || '1'),
+    type: toKey(row.type),
+    batteryType: toKey(row.batteryType),
+    color: toKey(row.color),
+  })
   dialogVisible.value = true
   if (formRef.value) formRef.value.clearValidate()
 }
@@ -375,14 +501,23 @@ const handleUnbind = (row) => {
     .catch(() => {})
 }
 
-const openBindDialog = (row) => {
+const openBindDialog = async (row) => {
   currentVehicleId.value = row.id
   currentVehicleLicense.value = row.license
   selectedFenceId.value = null
+  await loadGeofenceOptions()
+  if (geofenceOptions.value.length === 0) {
+    ElMessage.warning('当前没有可绑定的启用围栏，请先到围栏页面创建并启用围栏')
+    return
+  }
   bindVisible.value = true
 }
 
 const submitBind = async () => {
+  if (!selectedFenceId.value) {
+    ElMessage.warning('请选择要绑定的围栏')
+    return
+  }
   await bindVehicle(selectedFenceId.value, currentVehicleId.value)
   ElMessage.success('分配围栏成功！')
   bindVisible.value = false
@@ -390,6 +525,8 @@ const submitBind = async () => {
 }
 
 onMounted(() => {
+  loadDictOptions()
+  loadGeofenceOptions()
   getList()
 })
 </script>

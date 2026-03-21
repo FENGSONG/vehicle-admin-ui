@@ -57,13 +57,13 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="操作" width="140" fixed="right" align="right">
-        <template #default="{ row }">
-          <el-button link type="primary" @click="openEditDialog(row)">编辑</el-button>
-          <el-button link type="danger" @click="handleDelete(row)">删除</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
+        <el-table-column label="操作" width="140" fixed="right" align="right">
+          <template #default="{ row }">
+            <el-button link type="primary" @click="handleEditGuide(row)">重绘提示</el-button>
+            <el-button link type="danger" @click="handleDelete(row)">删除</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
 
     <div class="pagination-wrapper">
       <el-pagination
@@ -76,30 +76,13 @@
       />
     </div>
 
-    <el-dialog v-model="editDialogVisible" title="编辑地理围栏" width="400px" destroy-on-close>
-      <div style="margin-bottom: 20px; font-size: 13px; color: #86868b">
-        注意：此处仅支持修改围栏名称。若需修改范围，请删除后重新绘制。
-      </div>
-      <el-form :model="editForm" label-position="top">
-        <el-form-item label="围栏名称">
-          <el-input v-model="editForm.name" placeholder="请输入新的围栏名称" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <span class="dialog-footer">
-          <el-button @click="editDialogVisible = false">取消</el-button>
-          <el-button type="primary" class="mac-button-blue" @click="submitEdit">保存修改</el-button>
-        </span>
-      </template>
-    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
-import { Search } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getGeofenceList, deleteGeofence, updateGeofenceStatus, saveGeofence } from '@/api/geofence'
+import { getGeofenceList, deleteGeofence, updateGeofenceStatus } from '@/api/geofence'
 
 const loading = ref(false)
 const allData = ref([])
@@ -109,9 +92,6 @@ const queryParams = reactive({ name: '' })
 const currentPage = ref(1)
 const pageSize = ref(8)
 const total = ref(0)
-
-const editDialogVisible = ref(false)
-const editForm = reactive({ id: null, name: '' })
 
 onMounted(() => {
   fetchList()
@@ -159,7 +139,7 @@ const getShapeInfo = (posStr) => {
     } else if (data.type === 'rectangle') {
       return { name: '方形', type: 'primary', range: `矩形覆盖区域` }
     }
-  } catch (e) {
+  } catch {
     return { name: '解析异常', type: 'danger', range: '--' }
   }
 }
@@ -170,37 +150,13 @@ const handleStatusChange = async (row) => {
     ElMessage.success(`围栏【${row.name}】状态已更新！`)
     const itemInAllData = allData.value.find((item) => item.id === row.id)
     if (itemInAllData) itemInAllData.status = row.status
-  } catch (error) {
+  } catch {
     row.status = row.status === 1 ? 0 : 1
   }
 }
 
-const openEditDialog = (row) => {
-  editForm.id = row.id
-  editForm.name = row.name
-  editDialogVisible.value = true
-}
-
-const submitEdit = async () => {
-  if (!editForm.name) {
-    ElMessage.warning('名称不能为空！')
-    return
-  }
-  try {
-    const originalRow = allData.value.find((item) => item.id === editForm.id)
-    const payload = {
-      id: editForm.id,
-      name: editForm.name,
-      status: originalRow.status,
-      position: originalRow.position,
-    }
-    await saveGeofence(payload)
-    ElMessage.success('修改成功！')
-    editDialogVisible.value = false
-    fetchList()
-  } catch (error) {
-    console.error('修改失败:', error)
-  }
+const handleEditGuide = (row) => {
+  ElMessage.warning(`后端当前不支持编辑围栏【${row.name}】，请删除后在“围栏绘制区”重新创建`)
 }
 
 const handleDelete = (row) => {

@@ -59,7 +59,7 @@
 
         <el-table-column label="审批操作" width="200" fixed="right" align="center">
           <template #default="{ row }">
-            <template v-if="(row.auditStatus || row.status) == '10'">
+            <template v-if="canOperate(row)">
               <el-button link type="success" @click="handlePass(row)">
                 <el-icon><Check /></el-icon> 同意
               </el-button>
@@ -67,7 +67,7 @@
                 <el-icon><Close /></el-icon> 驳回
               </el-button>
             </template>
-            <span v-else style="color: #909399; font-size: 13px">已处理</span>
+            <span v-else style="color: #909399; font-size: 13px">{{ getOperateHint(row) }}</span>
           </template>
         </el-table-column>
       </el-table>
@@ -109,7 +109,7 @@
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
-import { Search, Check, Close } from '@element-plus/icons-vue'
+import { Check, Close } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { selectAuditList, updateAuditStatus } from '@/api/audit'
 
@@ -122,6 +122,7 @@ const pageSize = ref(8)
 
 // 🍎 新增：用于记录当前登录人的职级，控制页面标题展示
 const currentUserLevel = ref('')
+const currentUserId = ref(0)
 
 const queryParams = reactive({
   keyword: '',
@@ -153,12 +154,26 @@ const getStatusType = (status) => {
   return 'info'
 }
 
+const getRowAuditStatus = (row) => String(row?.auditStatus || row?.status || '').trim()
+
+const canOperate = (row) => {
+  const auditStatus = getRowAuditStatus(row)
+  const auditUserId = Number(row?.auditUserId || 0)
+  return auditStatus === '10' && auditUserId > 0 && auditUserId === Number(currentUserId.value || 0)
+}
+
+const getOperateHint = (row) => {
+  if (getRowAuditStatus(row) === '10') return '待他人处理'
+  return '已处理'
+}
+
 onMounted(() => {
   const userInfoStr = localStorage.getItem('userInfo')
   if (userInfoStr) {
     try {
       const userInfo = JSON.parse(userInfoStr)
       currentUserLevel.value = String(userInfo.level)
+      currentUserId.value = Number(userInfo.id || 0)
 
       // 🍎 核心修改：如果是车管(99)，不传 auditUserId，让他看到所有人的待办；
       // 其他领导，只传自己的 ID，看自己的待办。

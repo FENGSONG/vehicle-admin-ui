@@ -33,14 +33,9 @@
         </el-form-item>
 
         <el-form-item label="启用状态 (status)">
-          <el-switch
-            v-model="fenceForm.status"
-            :active-value="1"
-            :inactive-value="0"
-            active-text="启用"
-            inactive-text="停用"
-            style="--el-switch-on-color: #34c759"
-          />
+          <div class="coordinate-badge">
+            <span class="text-green">新建围栏默认启用，保存后可在列表页切换状态</span>
+          </div>
         </el-form-item>
 
         <el-form-item label="已捕获坐标数据">
@@ -75,7 +70,7 @@ import { saveGeofence } from '@/api/geofence'
 // 定义向父组件发射的事件（保存成功后告诉父组件切换 Tab）
 const emit = defineEmits(['save-success'])
 
-const fenceForm = reactive({ name: '', status: 1 })
+const fenceForm = reactive({ name: '' })
 const drawMode = ref('rectangle')
 const geoData = ref(null)
 
@@ -163,7 +158,6 @@ const clearDraw = () => {
 const submitGeofence = async () => {
   const payload = {
     name: fenceForm.name,
-    status: fenceForm.status,
     position: JSON.stringify(geoData.value),
   }
   try {

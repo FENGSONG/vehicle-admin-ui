@@ -59,9 +59,12 @@ import {
   MapLocation,
   Document,
   Stamp,
-  Search, // 补上遗漏的 Search 图标
 } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+
+defineOptions({
+  name: 'AppLayout',
+})
 
 const router = useRouter()
 const route = useRoute()

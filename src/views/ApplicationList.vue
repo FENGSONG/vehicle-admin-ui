@@ -92,6 +92,9 @@
                 <template v-if="activeTab === 'mine' && row.status == '10'">
                   <el-button link type="danger" @click="handleCancel(row)">撤销</el-button>
                 </template>
+                <template v-if="activeTab === 'mine' && row.status == '60'">
+                  <el-button link type="warning" @click="handleBack(row)">还车</el-button>
+                </template>
 
                 <template v-if="activeTab === 'all'">
                   <el-button
@@ -100,9 +103,6 @@
                     type="success"
                     @click="openDistributeDialog(row)"
                     >分配</el-button
-                  >
-                  <el-button v-if="row.status == '60'" link type="warning" @click="handleBack(row)"
-                    >还车</el-button
                   >
                 </template>
 
@@ -479,11 +479,33 @@ const handleSearch = () => {
 const fetchList = async () => {
   loading.value = true
   try {
-    const res = await selectApplication(queryParams)
+    const requestParams = {}
+    if (queryParams.userId !== null && queryParams.userId !== undefined) {
+      requestParams.userId = queryParams.userId
+    }
+    const res = await selectApplication(requestParams)
     let rawData = res.data || []
 
     if (activeTab.value === 'mine') {
-      rawData = rawData.filter((item) => item.userId === currentUserId.value)
+      rawData = rawData.filter((item) => Number(item.userId) === Number(currentUserId.value))
+    }
+
+    const keyword = String(queryParams.keyword || '').trim().toLowerCase()
+    if (keyword) {
+      rawData = rawData.filter((item) => {
+        const text = [
+          item.id,
+          item.username,
+          item.reason,
+          item.departureAddr,
+          item.destinationAddr,
+          item.startTime,
+          item.endTime,
+        ]
+          .map((v) => String(v || '').toLowerCase())
+          .join(' ')
+        return text.includes(keyword)
+      })
     }
 
     allData.value = rawData
