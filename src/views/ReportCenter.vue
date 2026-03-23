@@ -39,6 +39,10 @@
         <div class="summary-value">￥{{ toMoney(totalChargeFee) }}</div>
       </div>
       <div class="summary-card">
+        <div class="summary-title">加油费用总额</div>
+        <div class="summary-value">￥{{ toMoney(totalFuelFee) }}</div>
+      </div>
+      <div class="summary-card">
         <div class="summary-title">出车总里程</div>
         <div class="summary-value">{{ toDecimal(totalTripMileage) }} km</div>
       </div>
@@ -57,7 +61,7 @@
     </div>
 
     <el-tabs v-model="activeTab" class="report-tabs">
-      <el-tab-pane label="10.8.1 充电费用报表" name="charge">
+      <el-tab-pane label="充电费用报表" name="charge">
         <div class="dual-panel">
           <div class="panel-card">
             <div class="panel-title">车辆维度（{{ periodLabel }}）</div>
@@ -87,7 +91,37 @@
         </div>
       </el-tab-pane>
 
-      <el-tab-pane label="10.8.2 出车次数报表" name="trip">
+      <el-tab-pane label="加油费用报表" name="fuel">
+        <div class="dual-panel">
+          <div class="panel-card">
+            <div class="panel-title">车辆维度（{{ periodLabel }}）</div>
+            <el-table :data="fuelByVehicle" height="300">
+              <el-table-column prop="periodLabel" label="周期" width="120" align="center" />
+              <el-table-column label="车辆" min-width="160">
+                <template #default="{ row }">{{ row.license || '--' }} / {{ row.brand || '--' }}</template>
+              </el-table-column>
+              <el-table-column prop="fuelOrderCount" label="订单数" width="90" align="center" />
+              <el-table-column prop="totalFuelLiter" label="加油量(L)" width="120" align="right" />
+              <el-table-column label="加油费用(元)" width="130" align="right">
+                <template #default="{ row }">{{ toMoney(row.totalFuelFee) }}</template>
+              </el-table-column>
+            </el-table>
+          </div>
+          <div class="panel-card">
+            <div class="panel-title">时间维度（全运营车辆）</div>
+            <el-table :data="fuelByTime" height="300">
+              <el-table-column prop="periodLabel" label="周期" width="120" align="center" />
+              <el-table-column prop="fuelOrderCount" label="订单数" width="90" align="center" />
+              <el-table-column prop="totalFuelLiter" label="加油量(L)" width="120" align="right" />
+              <el-table-column label="加油费用(元)" width="130" align="right">
+                <template #default="{ row }">{{ toMoney(row.totalFuelFee) }}</template>
+              </el-table-column>
+            </el-table>
+          </div>
+        </div>
+      </el-tab-pane>
+
+      <el-tab-pane label="出车次数报表" name="trip">
         <div class="dual-panel">
           <div class="panel-card">
             <div class="panel-title">车辆维度（里程+出车次数）</div>
@@ -115,7 +149,7 @@
         </div>
       </el-tab-pane>
 
-      <el-tab-pane label="10.8.3 违章情况报表" name="violation">
+      <el-tab-pane label="违章情况报表" name="violation">
         <div class="dual-panel">
           <div class="panel-card">
             <div class="panel-title">车主违章统计（次数+扣分）</div>
@@ -143,7 +177,7 @@
         </div>
       </el-tab-pane>
 
-      <el-tab-pane label="10.8.4 维修费用报表" name="repair">
+      <el-tab-pane label="维修费用报表" name="repair">
         <div class="dual-panel">
           <div class="panel-card">
             <div class="panel-title">运营车辆维保费用统计</div>
@@ -171,7 +205,7 @@
         </div>
       </el-tab-pane>
 
-      <el-tab-pane label="10.8.5 年检/投保费用报表" name="yearly">
+      <el-tab-pane label="年检/投保费用报表" name="yearly">
         <div class="dual-panel">
           <div class="panel-card">
             <div class="panel-title">车辆年检费用/投保费用（按年）</div>
@@ -213,6 +247,8 @@ import { selectVehicle } from '@/api/vehicle'
 import {
   selectChargeByVehicle,
   selectChargeByTime,
+  selectFuelByVehicle,
+  selectFuelByTime,
   selectTripByVehicle,
   selectTripByTime,
   selectViolationByOwner,
@@ -239,6 +275,8 @@ const vehicleOptions = ref([])
 
 const chargeByVehicle = ref([])
 const chargeByTime = ref([])
+const fuelByVehicle = ref([])
+const fuelByTime = ref([])
 const tripByVehicle = ref([])
 const tripByTime = ref([])
 const violationByOwner = ref([])
@@ -261,6 +299,9 @@ const toDecimal = (value) => toNumber(value).toFixed(2)
 
 const totalChargeFee = computed(() =>
   chargeByTime.value.reduce((sum, item) => sum + toNumber(item.totalChargeFee), 0),
+)
+const totalFuelFee = computed(() =>
+  fuelByTime.value.reduce((sum, item) => sum + toNumber(item.totalFuelFee), 0),
 )
 const totalTripMileage = computed(() =>
   tripByTime.value.reduce((sum, item) => sum + toNumber(item.totalMileage), 0),
@@ -305,6 +346,8 @@ const loadReports = async () => {
     const [
       chargeVehicleRes,
       chargeTimeRes,
+      fuelVehicleRes,
+      fuelTimeRes,
       tripVehicleRes,
       tripTimeRes,
       violationOwnerRes,
@@ -316,6 +359,8 @@ const loadReports = async () => {
     ] = await Promise.all([
       selectChargeByVehicle(params),
       selectChargeByTime(params),
+      selectFuelByVehicle(params),
+      selectFuelByTime(params),
       selectTripByVehicle(params),
       selectTripByTime(params),
       selectViolationByOwner(params),
@@ -328,6 +373,8 @@ const loadReports = async () => {
 
     chargeByVehicle.value = chargeVehicleRes?.data || []
     chargeByTime.value = chargeTimeRes?.data || []
+    fuelByVehicle.value = fuelVehicleRes?.data || []
+    fuelByTime.value = fuelTimeRes?.data || []
     tripByVehicle.value = tripVehicleRes?.data || []
     tripByTime.value = tripTimeRes?.data || []
     violationByOwner.value = violationOwnerRes?.data || []
@@ -391,7 +438,7 @@ onMounted(async () => {
 
 .summary-grid {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 10px;
 }
 

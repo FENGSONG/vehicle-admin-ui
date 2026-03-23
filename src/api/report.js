@@ -16,6 +16,22 @@ export function selectChargeByTime(params) {
   })
 }
 
+export function selectFuelByVehicle(params) {
+  return request({
+    url: '/v1/report/fuel/vehicle',
+    method: 'get',
+    params,
+  })
+}
+
+export function selectFuelByTime(params) {
+  return request({
+    url: '/v1/report/fuel/time',
+    method: 'get',
+    params,
+  })
+}
+
 export function selectTripByVehicle(params) {
   return request({
     url: '/v1/report/trip/vehicle',
