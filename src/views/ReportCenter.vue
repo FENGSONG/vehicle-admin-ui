@@ -31,6 +31,12 @@
         <el-option v-for="item in vehicleOptions" :key="item.id" :label="item.label" :value="item.id" />
       </el-select>
       <el-button class="mac-button-gray" @click="loadReports">刷新报表</el-button>
+      <el-button class="mac-button-blue" :disabled="loading" @click="exportCurrentReportExcel">
+        导出Excel
+      </el-button>
+      <el-button class="mac-button-blue" :disabled="loading" @click="exportCurrentReportWord">
+        导出Word
+      </el-button>
     </div>
 
     <div class="summary-grid">
@@ -296,6 +302,17 @@ const periodLabel = computed(() => {
 const toNumber = (value) => Number(value || 0)
 const toMoney = (value) => toNumber(value).toFixed(2)
 const toDecimal = (value) => toNumber(value).toFixed(2)
+const escapeHtml = (value) =>
+  String(value ?? '--')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+const pad2 = (value) => String(value).padStart(2, '0')
+const buildExportTime = () => {
+  const now = new Date()
+  return `${now.getFullYear()}${pad2(now.getMonth() + 1)}${pad2(now.getDate())}_${pad2(now.getHours())}${pad2(now.getMinutes())}${pad2(now.getSeconds())}`
+}
 
 const totalChargeFee = computed(() =>
   chargeByTime.value.reduce((sum, item) => sum + toNumber(item.totalChargeFee), 0),
@@ -388,6 +405,292 @@ const loadReports = async () => {
     ElMessage.error('加载统计报表失败，请检查后端报表接口或数据库报表数据')
   } finally {
     loading.value = false
+  }
+}
+
+const getCurrentReportConfig = () => {
+  const vehicleColumns = [
+    { label: '周期', value: (row) => row.periodLabel || '--' },
+    { label: '车辆', value: (row) => `${row.license || '--'} / ${row.brand || '--'}` },
+  ]
+  switch (activeTab.value) {
+    case 'charge':
+      return {
+        title: '充电费用报表',
+        sheets: [
+          {
+            name: '车辆维度',
+            rows: chargeByVehicle.value,
+            columns: [
+              ...vehicleColumns,
+              { label: '订单数', value: (row) => toNumber(row.chargeOrderCount) },
+              { label: '充电度数(kWh)', value: (row) => toDecimal(row.totalChargeKwh) },
+              { label: '充电费用(元)', value: (row) => toMoney(row.totalChargeFee) },
+            ],
+          },
+          {
+            name: '时间维度',
+            rows: chargeByTime.value,
+            columns: [
+              { label: '周期', value: (row) => row.periodLabel || '--' },
+              { label: '订单数', value: (row) => toNumber(row.chargeOrderCount) },
+              { label: '充电度数(kWh)', value: (row) => toDecimal(row.totalChargeKwh) },
+              { label: '充电费用(元)', value: (row) => toMoney(row.totalChargeFee) },
+            ],
+          },
+        ],
+      }
+    case 'fuel':
+      return {
+        title: '加油费用报表',
+        sheets: [
+          {
+            name: '车辆维度',
+            rows: fuelByVehicle.value,
+            columns: [
+              ...vehicleColumns,
+              { label: '订单数', value: (row) => toNumber(row.fuelOrderCount) },
+              { label: '加油量(L)', value: (row) => toDecimal(row.totalFuelLiter) },
+              { label: '加油费用(元)', value: (row) => toMoney(row.totalFuelFee) },
+            ],
+          },
+          {
+            name: '时间维度',
+            rows: fuelByTime.value,
+            columns: [
+              { label: '周期', value: (row) => row.periodLabel || '--' },
+              { label: '订单数', value: (row) => toNumber(row.fuelOrderCount) },
+              { label: '加油量(L)', value: (row) => toDecimal(row.totalFuelLiter) },
+              { label: '加油费用(元)', value: (row) => toMoney(row.totalFuelFee) },
+            ],
+          },
+        ],
+      }
+    case 'trip':
+      return {
+        title: '出车次数报表',
+        sheets: [
+          {
+            name: '车辆维度',
+            rows: tripByVehicle.value,
+            columns: [
+              ...vehicleColumns,
+              { label: '出车次数', value: (row) => toNumber(row.tripCount) },
+              { label: '运行里程(km)', value: (row) => toDecimal(row.totalMileage) },
+            ],
+          },
+          {
+            name: '时间维度',
+            rows: tripByTime.value,
+            columns: [
+              { label: '周期', value: (row) => row.periodLabel || '--' },
+              { label: '出车次数', value: (row) => toNumber(row.tripCount) },
+              { label: '运行里程(km)', value: (row) => toDecimal(row.totalMileage) },
+            ],
+          },
+        ],
+      }
+    case 'violation':
+      return {
+        title: '违章情况报表',
+        sheets: [
+          {
+            name: '车主违章统计',
+            rows: violationByOwner.value,
+            columns: [
+              { label: '周期', value: (row) => row.periodLabel || '--' },
+              { label: '车主', value: (row) => row.ownerUsername || '--' },
+              { label: '违章次数', value: (row) => toNumber(row.violationCount) },
+              { label: '扣分', value: (row) => toNumber(row.totalDeductPoints) },
+              { label: '罚款(元)', value: (row) => toMoney(row.totalFineFee) },
+            ],
+          },
+          {
+            name: '时间维度',
+            rows: violationByTime.value,
+            columns: [
+              { label: '周期', value: (row) => row.periodLabel || '--' },
+              { label: '违章次数', value: (row) => toNumber(row.violationCount) },
+              { label: '扣分', value: (row) => toNumber(row.totalDeductPoints) },
+              { label: '罚款(元)', value: (row) => toMoney(row.totalFineFee) },
+            ],
+          },
+        ],
+      }
+    case 'repair':
+      return {
+        title: '维修费用报表',
+        sheets: [
+          {
+            name: '车辆维度',
+            rows: repairByVehicle.value,
+            columns: [
+              ...vehicleColumns,
+              { label: '维保次数', value: (row) => toNumber(row.repairCount) },
+              { label: '维保费用(元)', value: (row) => toMoney(row.totalRepairFee) },
+            ],
+          },
+          {
+            name: '时间维度',
+            rows: repairByTime.value,
+            columns: [
+              { label: '周期', value: (row) => row.periodLabel || '--' },
+              { label: '维保次数', value: (row) => toNumber(row.repairCount) },
+              { label: '维保费用(元)', value: (row) => toMoney(row.totalRepairFee) },
+            ],
+          },
+        ],
+      }
+    case 'yearly':
+      return {
+        title: '年检投保费用报表',
+        sheets: [
+          {
+            name: '车辆维度',
+            rows: yearlyVehicleFee.value,
+            columns: [
+              { label: '年份', value: (row) => row.yearLabel || '--' },
+              { label: '车辆', value: (row) => `${row.license || '--'} / ${row.brand || '--'}` },
+              { label: '年检费用(元)', value: (row) => toMoney(row.inspectionFee) },
+              { label: '投保费用(元)', value: (row) => toMoney(row.insuranceFee) },
+            ],
+          },
+          {
+            name: '年度总计',
+            rows: yearlyTotalFee.value,
+            columns: [
+              { label: '年份', value: (row) => row.yearLabel || '--' },
+              { label: '年检总费用(元)', value: (row) => toMoney(row.totalInspectionFee) },
+              { label: '投保总费用(元)', value: (row) => toMoney(row.totalInsuranceFee) },
+            ],
+          },
+        ],
+      }
+    default:
+      return null
+  }
+}
+
+const buildSheetRows = (sheet) => {
+  const mappedRows = (sheet.rows || []).map((row) => {
+    const mapped = {}
+    sheet.columns.forEach((column) => {
+      mapped[column.label] = column.value(row)
+    })
+    return mapped
+  })
+  return mappedRows.length ? mappedRows : [{ 提示: '暂无数据' }]
+}
+
+const downloadBlob = (blob, fileName) => {
+  const url = window.URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = fileName
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  window.URL.revokeObjectURL(url)
+}
+
+const exportCurrentReportExcel = async () => {
+  try {
+    const report = getCurrentReportConfig()
+    if (!report) {
+      ElMessage.warning('当前报表不支持导出')
+      return
+    }
+    const XLSX = await import('xlsx')
+    const workbook = XLSX.utils.book_new()
+    report.sheets.forEach((sheet) => {
+      const worksheet = XLSX.utils.json_to_sheet(buildSheetRows(sheet))
+      XLSX.utils.book_append_sheet(workbook, worksheet, sheet.name.slice(0, 31))
+    })
+    XLSX.writeFile(workbook, `${report.title}_${buildExportTime()}.xlsx`)
+    ElMessage.success('Excel导出成功')
+  } catch (error) {
+    console.error('Excel导出失败', error)
+    ElMessage.error('Excel导出失败，请重试')
+  }
+}
+
+const buildWordTable = (sheet) => {
+  const columnsHtml = sheet.columns.map((column) => `<th>${escapeHtml(column.label)}</th>`).join('')
+  const rows = sheet.rows || []
+  const rowsHtml = rows.length
+    ? rows
+        .map((row) => {
+          const tds = sheet.columns
+            .map((column) => `<td>${escapeHtml(column.value(row))}</td>`)
+            .join('')
+          return `<tr>${tds}</tr>`
+        })
+        .join('')
+    : `<tr><td colspan="${sheet.columns.length}">暂无数据</td></tr>`
+  return `
+    <h3>${escapeHtml(sheet.name)}</h3>
+    <table>
+      <thead><tr>${columnsHtml}</tr></thead>
+      <tbody>${rowsHtml}</tbody>
+    </table>
+  `
+}
+
+const exportCurrentReportWord = () => {
+  try {
+    const report = getCurrentReportConfig()
+    if (!report) {
+      ElMessage.warning('当前报表不支持导出')
+      return
+    }
+    const dateRangeText =
+      Array.isArray(query.dateRange) && query.dateRange.length === 2
+        ? `${query.dateRange[0]} 至 ${query.dateRange[1]}`
+        : '全部时间'
+    const currentVehicle = vehicleOptions.value.find((item) => item.id === query.vehicleId)
+    const vehicleText = currentVehicle?.label || '全部车辆'
+    const summaryHtml = `
+      <div class="summary-line">充电费用总额：￥${toMoney(totalChargeFee.value)}</div>
+      <div class="summary-line">加油费用总额：￥${toMoney(totalFuelFee.value)}</div>
+      <div class="summary-line">出车总里程：${toDecimal(totalTripMileage.value)} km</div>
+      <div class="summary-line">违章总次数：${totalViolationCount.value}</div>
+      <div class="summary-line">维修费用总额：￥${toMoney(totalRepairFee.value)}</div>
+      <div class="summary-line">年检+投保总额：￥${toMoney(totalYearlyFee.value)}</div>
+    `
+    const sheetsHtml = report.sheets.map((sheet) => buildWordTable(sheet)).join('')
+    const html = `
+      <html>
+        <head>
+          <meta charset="utf-8" />
+          <style>
+            body { font-family: "Microsoft YaHei", sans-serif; color: #111827; padding: 20px; }
+            h1 { font-size: 24px; margin-bottom: 8px; }
+            h3 { margin-top: 24px; margin-bottom: 8px; font-size: 18px; }
+            .meta { color: #374151; margin-bottom: 4px; }
+            .summary { margin-top: 12px; margin-bottom: 16px; }
+            .summary-line { margin-bottom: 4px; }
+            table { border-collapse: collapse; width: 100%; margin-bottom: 10px; }
+            th, td { border: 1px solid #d1d5db; padding: 8px; font-size: 13px; text-align: left; }
+            th { background: #f3f4f6; }
+          </style>
+        </head>
+        <body>
+          <h1>${escapeHtml(report.title)}</h1>
+          <div class="meta">导出时间：${escapeHtml(new Date().toLocaleString())}</div>
+          <div class="meta">统计周期：${escapeHtml(periodLabel.value)}</div>
+          <div class="meta">时间范围：${escapeHtml(dateRangeText)}</div>
+          <div class="meta">车辆筛选：${escapeHtml(vehicleText)}</div>
+          <div class="summary">${summaryHtml}</div>
+          ${sheetsHtml}
+        </body>
+      </html>
+    `
+    const blob = new Blob([`\ufeff${html}`], { type: 'application/msword' })
+    downloadBlob(blob, `${report.title}_${buildExportTime()}.doc`)
+    ElMessage.success('Word导出成功')
+  } catch (error) {
+    console.error('Word导出失败', error)
+    ElMessage.error('Word导出失败，请重试')
   }
 }
 
@@ -505,6 +808,13 @@ onMounted(async () => {
   background-color: #e5e5ea;
   border-color: transparent;
   color: #1d1d1f;
+  border-radius: 8px;
+}
+
+.mac-button-blue {
+  background: linear-gradient(135deg, #5ea7ff 0%, #4f46e5 100%);
+  border-color: transparent;
+  color: #fff;
   border-radius: 8px;
 }
 
