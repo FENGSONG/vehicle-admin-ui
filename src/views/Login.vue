@@ -17,7 +17,11 @@
 
       <el-form :model="loginForm" @keyup.enter="handleLogin" class="mac-form">
         <el-form-item>
-          <el-input v-model="loginForm.username" placeholder="管理员账号" class="mac-input" />
+          <el-input
+            v-model="loginForm.account"
+            placeholder="账号（用户名/邮箱/手机号）"
+            class="mac-input"
+          />
         </el-form-item>
 
         <el-form-item>
@@ -55,12 +59,22 @@ const router = useRouter()
 const loading = ref(false)
 
 const loginForm = reactive({
-  username: '',
+  account: '',
   password: '',
 })
 
+const parseMenuPerms = (userInfo) => {
+  if (Array.isArray(userInfo?.menuPermList)) {
+    return userInfo.menuPermList.map((item) => String(item || '').trim()).filter((item) => !!item)
+  }
+  const rawPerms = String(userInfo?.menuPerms || '').trim()
+  return rawPerms
+    ? rawPerms.split(',').map((item) => String(item || '').trim()).filter((item) => !!item)
+    : []
+}
+
 const handleLogin = async () => {
-  if (!loginForm.username || !loginForm.password) {
+  if (!loginForm.account || !loginForm.password) {
     ElMessage({
       message: '请填写完整的登录信息',
       type: 'warning',
@@ -73,7 +87,7 @@ const handleLogin = async () => {
 
   try {
     const response = await axios.post('/api/v1/user/login', {
-      username: loginForm.username,
+      account: loginForm.account,
       password: loginForm.password,
     })
 
@@ -99,17 +113,19 @@ const handleLogin = async () => {
         customClass: 'mac-message',
       })
 
-      // 🍎 核心修改：根据用户的 level 智能跳转到不同的首页
-      const level = String(userInfo.level).trim()
+      const level = String(userInfo.level || '').trim()
+      const perms = parseMenuPerms(userInfo)
+      const hasPerm = (permCode) => {
+        if (level === '99') return true
+        if (!permCode) return true
+        return perms.includes('*') || perms.includes(permCode)
+      }
 
-      if (['40', '50'].includes(level)) {
-        // 总监(40)、总裁(50) 关注全盘数据，跳转到数据大盘
+      if (hasPerm('dashboard:view')) {
         router.push('/layout/dashboard')
-      } else if (['20', '30'].includes(level)) {
-        // 主管(20)、经理(30) 主要工作是审批，跳转到审批待办
+      } else if (hasPerm('audit:view')) {
         router.push('/layout/audit')
       } else {
-        // 基层员工(10) 和其他未知职级，默认跳转到自己的用车申请页面
         router.push('/layout/application')
       }
     } else {

@@ -6,21 +6,51 @@ import Dashboard from '../views/Dashboard.vue'
 import GeofenceMap from '@/views/GeofenceMap.vue'
 import UserList from '@/views/UserList.vue'
 import ApplicationList from '@/views/ApplicationList.vue'
-// 🍎 新增：引入审批待办页面 (请确保 views 目录下有这个文件)
 import AuditList from '@/views/AuditList.vue'
 import DictCenter from '@/views/DictCenter.vue'
+import VehicleMaintain from '@/views/VehicleMaintain.vue'
+import OrgList from '@/views/OrgList.vue'
+import RoleList from '@/views/RoleList.vue'
 
-const getCurrentUserLevel = () => {
+const getCurrentUserInfo = () => {
   try {
-    const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
-    return String(userInfo.level || '').trim()
+    return JSON.parse(localStorage.getItem('userInfo') || '{}')
   } catch {
-    return ''
+    return {}
   }
 }
 
+const getCurrentUserLevel = () => String(getCurrentUserInfo().level || '').trim()
+
+const getCurrentMenuPerms = () => {
+  const userInfo = getCurrentUserInfo()
+  if (Array.isArray(userInfo.menuPermList)) {
+    return userInfo.menuPermList.map((item) => String(item || '').trim()).filter((item) => !!item)
+  }
+  const rawPerms = String(userInfo.menuPerms || '').trim()
+  if (!rawPerms) return []
+  return rawPerms.split(',').map((item) => String(item || '').trim()).filter((item) => !!item)
+}
+
+const hasMenuPerm = (permCode) => {
+  if (!permCode) return true
+  if (getCurrentUserLevel() === '99') return true
+  const perms = getCurrentMenuPerms()
+  if (!perms.length) return false
+  return perms.includes('*') || perms.includes(permCode)
+}
+
 const getDefaultLayoutPath = () => {
-  return getCurrentUserLevel() === '99' ? '/layout/dashboard' : '/layout/application'
+  const candidates = [
+    { path: '/layout/dashboard', perm: 'dashboard:view' },
+    { path: '/layout/application', perm: 'application:view' },
+    { path: '/layout/audit', perm: 'audit:view' },
+    { path: '/layout/vehicle', perm: 'vehicle:view' },
+  ]
+  for (const item of candidates) {
+    if (hasMenuPerm(item.perm)) return item.path
+  }
+  return '/layout/application'
 }
 
 const router = createRouter({
@@ -41,44 +71,65 @@ const router = createRouter({
       component: Layout,
       redirect: () => getDefaultLayoutPath(),
       children: [
-        //  子路由配置
         {
           path: 'dashboard',
           name: 'dashboard',
           component: Dashboard,
+          meta: { perm: 'dashboard:view' },
         },
         {
           path: 'vehicle',
           name: 'vehicle',
           component: VehicleList,
+          meta: { perm: 'vehicle:view' },
         },
         {
           path: 'geofence',
           name: 'GeofenceMap',
           component: GeofenceMap,
+          meta: { perm: 'geofence:view' },
         },
-        // 🍎 用户模块路由配置
         {
           path: 'user',
           name: 'UserList',
           component: UserList,
+          meta: { perm: 'user:manage' },
+        },
+        {
+          path: 'org',
+          name: 'OrgList',
+          component: OrgList,
+          meta: { perm: 'org:manage' },
+        },
+        {
+          path: 'role',
+          name: 'RoleList',
+          component: RoleList,
+          meta: { perm: 'role:manage' },
         },
         {
           path: 'application',
           name: 'ApplicationList',
           component: ApplicationList,
+          meta: { perm: 'application:view' },
         },
-        // 🍎 新增：审批待办路由配置
-        // 访问路径将是：/layout/audit
         {
           path: 'audit',
           name: 'AuditList',
           component: AuditList,
+          meta: { perm: 'audit:view' },
         },
         {
           path: 'dict-center',
           name: 'DictCenter',
           component: DictCenter,
+          meta: { perm: 'dict:manage' },
+        },
+        {
+          path: 'vehicle-maintain',
+          name: 'VehicleMaintain',
+          component: VehicleMaintain,
+          meta: { perm: 'vehicle:maintain:view' },
         },
       ],
     },
@@ -86,14 +137,23 @@ const router = createRouter({
 })
 
 router.beforeEach((to, from, next) => {
-  if (to.path === '/layout/dashboard' && getCurrentUserLevel() !== '99') {
-    next('/layout/application')
+  const token = String(localStorage.getItem('token') || '').trim()
+
+  if (!token && to.path !== '/login') {
+    next('/login')
     return
   }
-  if (to.path === '/layout/dict-center' && getCurrentUserLevel() !== '99') {
-    next('/layout/application')
+
+  if (token && to.path === '/login') {
+    next(getDefaultLayoutPath())
     return
   }
+
+  if (to.meta?.perm && !hasMenuPerm(to.meta.perm)) {
+    next(getDefaultLayoutPath())
+    return
+  }
+
   next()
 })
 

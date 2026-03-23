@@ -56,6 +56,9 @@
           </template>
         </el-table-column>
 
+        <el-table-column prop="orgName" label="所属组织" min-width="130" show-overflow-tooltip />
+        <el-table-column prop="roleName" label="角色" min-width="120" show-overflow-tooltip />
+
         <el-table-column label="账号状态" width="100" align="center">
           <template #default="{ row }">
             <el-switch
@@ -156,6 +159,31 @@
           </el-col>
 
           <el-col :span="12">
+            <el-form-item label="所属组织 (orgId)">
+              <el-select v-model="userForm.orgId" placeholder="请选择组织" style="width: 100%" clearable filterable>
+                <el-option
+                  v-for="org in orgOptions"
+                  :key="org.id"
+                  :label="`${org.orgName}（${org.orgType}）`"
+                  :value="org.id"
+                />
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="角色 (roleCode)" prop="roleCode">
+              <el-select v-model="userForm.roleCode" placeholder="请选择角色" style="width: 100%" filterable>
+                <el-option
+                  v-for="role in roleOptions"
+                  :key="role.roleCode"
+                  :label="`${role.roleName}（${role.roleCode}）`"
+                  :value="role.roleCode"
+                />
+              </el-select>
+            </el-form-item>
+          </el-col>
+
+          <el-col :span="12">
             <el-form-item label="性别 (gender)" prop="gender">
               <el-radio-group v-model="userForm.gender">
                 <el-radio label="1">男</el-radio>
@@ -195,6 +223,8 @@ import { ref, reactive, onMounted } from 'vue'
 import { Plus } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { selectUser, saveUser, deleteUser, updateStatus, resetPassword } from '@/api/user'
+import { selectRole } from '@/api/role'
+import { selectOrg } from '@/api/org'
 
 const loading = ref(false)
 const allData = ref([])
@@ -214,6 +244,8 @@ const submitLoading = ref(false)
 const formRef = ref(null)
 
 const leaderOptions = ref([])
+const roleOptions = ref([])
+const orgOptions = ref([])
 
 const userForm = reactive({
   id: null,
@@ -223,6 +255,8 @@ const userForm = reactive({
   age: null,
   level: '',
   parentId: null,
+  orgId: null,
+  roleCode: '',
   gender: '1',
   status: '1',
 })
@@ -243,6 +277,7 @@ const rules = {
   ],
   level: [{ required: true, message: '职级不能为空', trigger: 'change' }],
   parentId: [{ required: true, message: '直属领导不能为空', trigger: 'change' }],
+  roleCode: [{ required: true, message: '角色不能为空', trigger: 'change' }],
   gender: [{ required: true, message: '性别不能为空', trigger: 'change' }],
   status: [{ required: true, message: '状态不能为空', trigger: 'change' }],
 }
@@ -281,6 +316,8 @@ const getLevelTagType = (level) => {
 onMounted(() => {
   fetchList()
   loadLeaders()
+  loadRoleOptions()
+  loadOrgOptions()
 })
 
 const handleSearch = () => {
@@ -330,6 +367,26 @@ const loadLeaders = async () => {
   }
 }
 
+const loadRoleOptions = async () => {
+  try {
+    const res = await selectRole({ status: '1' })
+    roleOptions.value = res.data || []
+  } catch (error) {
+    console.warn('获取角色列表失败', error)
+    roleOptions.value = []
+  }
+}
+
+const loadOrgOptions = async () => {
+  try {
+    const res = await selectOrg({ status: '1' })
+    orgOptions.value = res.data || []
+  } catch (error) {
+    console.warn('获取组织列表失败', error)
+    orgOptions.value = []
+  }
+}
+
 const handleCurrentChange = (val) => {
   currentPage.value = val
   updatePageData()
@@ -356,6 +413,8 @@ const handleAdd = () => {
     age: null,
     level: '',
     parentId: null,
+    orgId: null,
+    roleCode: '',
     gender: '1',
     status: '1',
   })
@@ -373,6 +432,8 @@ const handleEdit = (row) => {
     age: row.age,
     level: row.level,
     parentId: row.parentId,
+    orgId: row.orgId,
+    roleCode: row.roleCode,
     gender: row.gender,
     status: row.status,
   })
@@ -391,6 +452,8 @@ const submitForm = () => {
         dialogVisible.value = false
         fetchList()
         loadLeaders()
+        loadRoleOptions()
+        loadOrgOptions()
       } catch (error) {
         console.error('保存失败:', error)
       } finally {

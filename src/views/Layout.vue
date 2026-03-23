@@ -60,6 +60,8 @@ import {
   Document,
   Stamp,
   Grid,
+  OfficeBuilding,
+  Lock,
 } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
@@ -76,6 +78,7 @@ const currentPath = computed(() => route.path)
 
 const currentUserLevel = ref('10') // 默认基层员工
 const currentUserName = ref('未登录')
+const currentUserMenuPerms = ref([])
 
 const checkWidth = () => {
   isMobileMenuHidden.value = window.innerWidth < 1024
@@ -92,6 +95,16 @@ onMounted(() => {
       if (userInfo.username) {
         currentUserName.value = userInfo.username
       }
+      if (Array.isArray(userInfo.menuPermList)) {
+        currentUserMenuPerms.value = userInfo.menuPermList
+          .map((item) => String(item || '').trim())
+          .filter((item) => !!item)
+      } else {
+        const rawPerms = String(userInfo.menuPerms || '').trim()
+        currentUserMenuPerms.value = rawPerms
+          ? rawPerms.split(',').map((item) => String(item || '').trim()).filter((item) => !!item)
+          : []
+      }
     } catch (error) {
       console.error('解析本地用户信息失败', error)
     }
@@ -105,62 +118,96 @@ onUnmounted(() => {
   window.removeEventListener('resize', checkWidth)
 })
 
-// 🍎 核心修改：重新分配菜单权限
-// 假设 '99' 代表全能的车管调度员/系统管理员
 const allMenuItems = [
   {
     title: '数据大盘',
     icon: DataLine,
     path: '/layout/dashboard',
-    // 仅调度员可查看数据大盘
+    perm: 'dashboard:view',
     allowedRoles: ['99'],
   },
   {
     title: '车辆管理',
     icon: Van,
     path: '/layout/vehicle',
-    // 只有车管调度员能看
+    perm: 'vehicle:view',
+    allowedRoles: ['99'],
+  },
+  {
+    title: '车务维护',
+    icon: Van,
+    path: '/layout/vehicle-maintain',
+    perm: 'vehicle:maintain:view',
     allowedRoles: ['99'],
   },
   {
     title: '地理围栏',
     icon: MapLocation,
     path: '/layout/geofence',
-    // 只有车管调度员能看
+    perm: 'geofence:view',
     allowedRoles: ['99'],
   },
   {
     title: '用户管理',
     icon: User,
     path: '/layout/user',
-    // 只有车管调度员能看 (或者你想让总裁也能看，可以加上 '50')
+    perm: 'user:manage',
+    allowedRoles: ['99'],
+  },
+  {
+    title: '组织管理',
+    icon: OfficeBuilding,
+    path: '/layout/org',
+    perm: 'org:manage',
+    allowedRoles: ['99'],
+  },
+  {
+    title: '角色权限',
+    icon: Lock,
+    path: '/layout/role',
+    perm: 'role:manage',
     allowedRoles: ['99'],
   },
   {
     title: '用车申请',
     icon: Document,
     path: '/layout/application',
-    // 所有人都能发起申请
+    perm: 'application:view',
     allowedRoles: ['10', '20', '30', '40', '50', '99'],
   },
   {
     title: '审批待办',
     icon: Stamp,
     path: '/layout/audit',
-    // 各级领导和车管能看，基层员工(10)不能看
+    perm: 'audit:view',
     allowedRoles: ['20', '30', '40', '50', '99'],
   },
   {
     title: '字典中心',
     icon: Grid,
     path: '/layout/dict-center',
-    // 仅车管调度员可维护字典
+    perm: 'dict:manage',
     allowedRoles: ['99'],
   },
 ]
 
+const hasMenuPerm = (permCode) => {
+  if (!permCode) return true
+  if (currentUserLevel.value === '99') return true
+  const perms = currentUserMenuPerms.value
+  if (!perms.length) return false
+  return perms.includes('*') || perms.includes(permCode)
+}
+
 const visibleMenuItems = computed(() => {
-  return allMenuItems.filter((item) => item.allowedRoles.includes(currentUserLevel.value))
+  if (currentUserLevel.value === '99') return allMenuItems
+  const hasRbacPerms = currentUserMenuPerms.value.length > 0
+  return allMenuItems.filter((item) => {
+    if (hasRbacPerms) {
+      return hasMenuPerm(item.perm)
+    }
+    return item.allowedRoles.includes(currentUserLevel.value)
+  })
 })
 
 const handleMenuClick = (item) => {
