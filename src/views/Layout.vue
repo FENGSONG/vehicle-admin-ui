@@ -127,6 +127,13 @@ const allMenuItems = [
     allowedRoles: ['99'],
   },
   {
+    title: '统计报表',
+    icon: DataLine,
+    path: '/layout/report',
+    perm: 'report:view',
+    allowedRoles: ['99', '40', '50', '30', '20'],
+  },
+  {
     title: '车辆管理',
     icon: Van,
     path: '/layout/vehicle',

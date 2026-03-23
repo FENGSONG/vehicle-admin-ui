@@ -11,6 +11,7 @@ import DictCenter from '@/views/DictCenter.vue'
 import VehicleMaintain from '@/views/VehicleMaintain.vue'
 import OrgList from '@/views/OrgList.vue'
 import RoleList from '@/views/RoleList.vue'
+import ReportCenter from '@/views/ReportCenter.vue'
 
 const getCurrentUserInfo = () => {
   try {
@@ -34,9 +35,20 @@ const getCurrentMenuPerms = () => {
 
 const hasMenuPerm = (permCode) => {
   if (!permCode) return true
-  if (getCurrentUserLevel() === '99') return true
+  const level = getCurrentUserLevel()
+  if (level === '99') return true
   const perms = getCurrentMenuPerms()
-  if (!perms.length) return false
+  if (!perms.length) {
+    const fallbackPermMap = {
+      10: ['application:view'],
+      20: ['application:view', 'audit:view', 'report:view'],
+      30: ['application:view', 'audit:view', 'report:view'],
+      40: ['application:view', 'audit:view', 'report:view'],
+      50: ['application:view', 'audit:view', 'report:view'],
+    }
+    const fallbackPerms = fallbackPermMap[level] || []
+    return fallbackPerms.includes(permCode)
+  }
   return perms.includes('*') || perms.includes(permCode)
 }
 
@@ -45,6 +57,7 @@ const getDefaultLayoutPath = () => {
     { path: '/layout/dashboard', perm: 'dashboard:view' },
     { path: '/layout/application', perm: 'application:view' },
     { path: '/layout/audit', perm: 'audit:view' },
+    { path: '/layout/report', perm: 'report:view' },
     { path: '/layout/vehicle', perm: 'vehicle:view' },
   ]
   for (const item of candidates) {
@@ -124,6 +137,12 @@ const router = createRouter({
           name: 'DictCenter',
           component: DictCenter,
           meta: { perm: 'dict:manage' },
+        },
+        {
+          path: 'report',
+          name: 'ReportCenter',
+          component: ReportCenter,
+          meta: { perm: 'report:view' },
         },
         {
           path: 'vehicle-maintain',
