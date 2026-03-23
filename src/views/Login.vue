@@ -103,9 +103,13 @@ const handleLogin = async () => {
         return
       }
 
-      // 把完整的用户信息存入本地
-      localStorage.setItem('userInfo', JSON.stringify(userInfo))
-      localStorage.setItem('token', token)
+      const safeUserInfo = { ...userInfo }
+      delete safeUserInfo.token
+      sessionStorage.setItem('userInfo', JSON.stringify(safeUserInfo))
+      sessionStorage.setItem('token', token)
+      // 兼容旧代码读取
+      localStorage.setItem('userInfo', JSON.stringify(safeUserInfo))
+      localStorage.removeItem('token')
 
       ElMessage({
         message: `欢迎回来，${userInfo.username}`,

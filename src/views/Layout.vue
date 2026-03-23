@@ -85,7 +85,7 @@ const checkWidth = () => {
 }
 
 onMounted(() => {
-  const userInfoStr = localStorage.getItem('userInfo')
+  const userInfoStr = sessionStorage.getItem('userInfo') || localStorage.getItem('userInfo')
   if (userInfoStr) {
     try {
       const userInfo = JSON.parse(userInfoStr)
@@ -238,6 +238,8 @@ const handleLogout = () => {
     center: true,
   })
     .then(() => {
+      sessionStorage.removeItem('userInfo')
+      sessionStorage.removeItem('token')
       localStorage.removeItem('userInfo')
       localStorage.removeItem('token')
 

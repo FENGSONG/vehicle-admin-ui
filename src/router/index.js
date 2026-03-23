@@ -15,7 +15,7 @@ import ReportCenter from '@/views/ReportCenter.vue'
 
 const getCurrentUserInfo = () => {
   try {
-    return JSON.parse(localStorage.getItem('userInfo') || '{}')
+    return JSON.parse(sessionStorage.getItem('userInfo') || localStorage.getItem('userInfo') || '{}')
   } catch {
     return {}
   }
@@ -156,7 +156,7 @@ const router = createRouter({
 })
 
 router.beforeEach((to, from, next) => {
-  const token = String(localStorage.getItem('token') || '').trim()
+  const token = String(sessionStorage.getItem('token') || localStorage.getItem('token') || '').trim()
 
   if (!token && to.path !== '/login') {
     next('/login')

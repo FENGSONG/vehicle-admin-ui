@@ -501,7 +501,7 @@ const handleDeleteOption = (row) => {
 
 onMounted(async () => {
   try {
-    const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
+    const userInfo = JSON.parse(sessionStorage.getItem('userInfo') || localStorage.getItem('userInfo') || '{}')
     if (String(userInfo?.level || '') !== '99') {
       ElMessage.warning('仅车管调度员可访问字典中心')
       router.replace('/layout/application')

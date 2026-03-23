@@ -773,7 +773,7 @@ const fetchVehicleHall = async (showLoading = true) => {
 }
 
 onMounted(async () => {
-  const userInfoStr = localStorage.getItem('userInfo')
+  const userInfoStr = sessionStorage.getItem('userInfo') || localStorage.getItem('userInfo')
   if (userInfoStr) {
     try {
       const userInfo = JSON.parse(userInfoStr)

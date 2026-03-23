@@ -9,18 +9,25 @@ const request = axios.create({
   timeout: 10000 // 请求超时时间设置为 10 秒
 })
 
-const getStoredToken = () => {
-  const token = String(localStorage.getItem('token') || '').trim()
-  if (token) return token
+const getStoredUserInfo = () => {
+  const raw = sessionStorage.getItem('userInfo') || localStorage.getItem('userInfo') || '{}'
   try {
-    const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
-    return String(userInfo.token || '').trim()
+    return JSON.parse(raw)
   } catch {
-    return ''
+    return {}
   }
 }
 
+const getStoredToken = () => {
+  const token = String(sessionStorage.getItem('token') || localStorage.getItem('token') || '').trim()
+  if (token) return token
+  const userInfo = getStoredUserInfo()
+  return String(userInfo.token || '').trim()
+}
+
 const clearLoginStorage = () => {
+  sessionStorage.removeItem('token')
+  sessionStorage.removeItem('userInfo')
   localStorage.removeItem('token')
   localStorage.removeItem('userInfo')
 }
