@@ -111,8 +111,8 @@ const allMenuItems = [
     title: '数据大盘',
     icon: DataLine,
     path: '/layout/dashboard',
-    // 所有人都能看数据大盘
-    allowedRoles: ['10', '20', '30', '40', '50', '99'],
+    // 仅调度员可查看数据大盘
+    allowedRoles: ['99'],
   },
   {
     title: '车辆管理',

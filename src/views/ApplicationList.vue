@@ -10,12 +10,17 @@
       <div class="mac-table-card">
         <div class="table-header-actions">
           <div class="header-left">
-            <el-button type="primary" class="mac-button-blue" @click="handleAdd">
-              <el-icon><Plus /></el-icon>提交用车申请
-            </el-button>
+            <el-radio-group
+              v-model="panelMode"
+              class="mac-segmented-control"
+              @change="handlePanelChange"
+            >
+              <el-radio-button label="hall">车辆大厅</el-radio-button>
+              <el-radio-button label="orders">订单管理</el-radio-button>
+            </el-radio-group>
 
             <el-radio-group
-              v-if="isAdmin"
+              v-if="panelMode === 'orders' && isAdmin"
               v-model="activeTab"
               class="mac-segmented-control"
               @change="handleTabChange"
@@ -25,7 +30,7 @@
             </el-radio-group>
           </div>
 
-          <div class="search-box">
+          <div v-if="panelMode === 'orders'" class="search-box">
             <el-input
               v-model="queryParams.keyword"
               :placeholder="activeTab === 'mine' ? '搜索我的订单...' : '搜索全公司订单...'"
@@ -37,93 +42,151 @@
             />
             <el-button class="mac-button-gray" @click="handleSearch">搜索</el-button>
           </div>
+
+          <div v-else class="search-box">
+            <el-input
+              v-model="hallKeyword"
+              placeholder="搜索车牌号 / 品牌 / 车辆ID..."
+              prefix-icon="Search"
+              clearable
+              class="mac-search-input"
+              @keyup.enter="handleHallSearch"
+              @clear="handleHallSearch"
+            />
+            <el-button class="mac-button-gray" @click="handleHallSearch">搜索</el-button>
+          </div>
         </div>
 
-        <el-table
-          :data="tableList"
-          v-loading="loading"
-          style="width: 100%; flex: 1"
-          height="100%"
-          :row-style="{ height: '64px' }"
-        >
-          <el-table-column type="index" label="编号" width="60" align="center" />
+        <template v-if="panelMode === 'hall'">
+          <div class="hall-toolbar">
+            <el-radio-group v-model="hallTypeFilter" class="mac-segmented-control hall-type-switch">
+              <el-radio-button label="all">全部</el-radio-button>
+              <el-radio-button v-for="item in typeOptions" :key="`hall-${item.value}`" :label="item.value">
+                {{ item.label }}
+              </el-radio-button>
+            </el-radio-group>
+            <div class="hall-summary">可申请 {{ availableHallCount }} / {{ filteredHallVehicles.length }}</div>
+          </div>
 
-          <el-table-column
-            v-if="activeTab === 'all'"
-            prop="username"
-            label="申请人"
-            min-width="90"
-            align="center"
-          />
-
-          <el-table-column
-            prop="destinationAddr"
-            label="目的地"
-            min-width="130"
-            show-overflow-tooltip
-            align="center"
-          />
-          <el-table-column
-            prop="reason"
-            label="用车原因"
-            min-width="130"
-            show-overflow-tooltip
-            align="center"
-          />
-          <el-table-column prop="startTime" label="开始时间" min-width="155" align="center" />
-          <el-table-column prop="endTime" label="结束时间" min-width="155" align="center" />
-
-          <el-table-column label="当前状态" min-width="100" align="center">
-            <template #default="{ row }">
-              <el-tag :type="getAppStatusTagType(row.status)" size="small" effect="light">
-                {{ getAppStatusText(row.status) }}
-              </el-tag>
-            </template>
-          </el-table-column>
-
-          <el-table-column
-            label="操作"
-            :min-width="activeTab === 'all' ? 220 : 130"
-            align="right"
-            header-align="right"
-          >
-            <template #default="{ row }">
-              <div class="action-btn-group">
-                <template v-if="activeTab === 'mine' && row.status == '10'">
-                  <el-button link type="danger" @click="handleCancel(row)">撤销</el-button>
-                </template>
-                <template v-if="activeTab === 'mine' && row.status == '60'">
-                  <el-button link type="warning" @click="handleBack(row)">还车</el-button>
-                </template>
-
-                <template v-if="activeTab === 'all'">
-                  <el-button
-                    v-if="row.status == '50'"
-                    link
-                    type="success"
-                    @click="openDistributeDialog(row)"
-                    >分配</el-button
-                  >
-                </template>
-
-                <el-button link type="primary" @click="openOrderDetails(row)">
-                  <el-icon><Document /></el-icon> 订单详情
+          <div class="hall-grid" v-loading="hallLoading">
+            <template v-if="filteredHallVehicles.length > 0">
+              <div
+                v-for="item in filteredHallVehicles"
+                :key="item.id"
+                class="hall-vehicle-card"
+                :class="{ unavailable: !isVehicleIdle(item) }"
+              >
+                <div class="hall-card-top">
+                  <div class="hall-license">{{ item.license || `车辆-${item.id}` }}</div>
+                  <el-tag :type="isVehicleIdle(item) ? 'success' : 'info'" effect="light" round size="small">
+                    {{ getHallStatusText(item) }}
+                  </el-tag>
+                </div>
+                <div class="hall-meta">
+                  {{ item.brand || '未知品牌' }} · {{ getVehicleTypeText(item.type) }} · {{ getVehicleColorText(item.color) }}
+                </div>
+                <div class="hall-meta light">车辆ID：{{ item.id }}</div>
+                <el-button
+                  class="hall-apply-btn"
+                  type="primary"
+                  :disabled="!isVehicleIdle(item)"
+                  @click="openApplyByVehicle(item)"
+                >
+                  {{ isVehicleIdle(item) ? '立即申请' : '不可申请' }}
                 </el-button>
               </div>
             </template>
-          </el-table-column>
-        </el-table>
+            <el-empty v-else-if="!hallLoading" class="hall-empty" description="暂无可展示车辆" :image-size="90" />
+          </div>
+        </template>
 
-        <div class="pagination-wrapper">
-          <el-pagination
-            v-model:current-page="currentPage"
-            :page-size="pageSize"
-            :total="total"
-            background
-            layout="total, prev, pager, next, jumper"
-            @current-change="handleCurrentChange"
-          />
-        </div>
+        <template v-else>
+          <el-table
+            :data="tableList"
+            v-loading="loading"
+            style="width: 100%; flex: 1"
+            height="100%"
+            :row-style="{ height: '64px' }"
+          >
+            <el-table-column type="index" label="编号" width="60" align="center" />
+
+            <el-table-column
+              v-if="activeTab === 'all'"
+              prop="username"
+              label="申请人"
+              min-width="90"
+              align="center"
+            />
+
+            <el-table-column
+              prop="destinationAddr"
+              label="目的地"
+              min-width="130"
+              show-overflow-tooltip
+              align="center"
+            />
+            <el-table-column
+              prop="reason"
+              label="用车原因"
+              min-width="130"
+              show-overflow-tooltip
+              align="center"
+            />
+            <el-table-column prop="startTime" label="开始时间" min-width="155" align="center" />
+            <el-table-column prop="endTime" label="结束时间" min-width="155" align="center" />
+
+            <el-table-column label="当前状态" min-width="110" align="center">
+              <template #default="{ row }">
+                <el-tag :type="getAppStatusTagType(row.status)" size="small" effect="light">
+                  {{ getAppStatusText(row.status) }}
+                </el-tag>
+              </template>
+            </el-table-column>
+
+            <el-table-column
+              label="操作"
+              :min-width="activeTab === 'all' ? 220 : 130"
+              align="right"
+              header-align="right"
+            >
+              <template #default="{ row }">
+                <div class="action-btn-group">
+                  <template v-if="activeTab === 'mine' && row.status == '10'">
+                    <el-button link type="danger" @click="handleCancel(row)">撤销</el-button>
+                  </template>
+                  <template v-if="activeTab === 'mine' && row.status == '60'">
+                    <el-button link type="warning" @click="handleBack(row)">还车</el-button>
+                  </template>
+
+                  <template v-if="activeTab === 'all'">
+                    <el-button
+                      v-if="row.status == '50'"
+                      link
+                      type="success"
+                      @click="openDistributeDialog(row)"
+                      >分配</el-button
+                    >
+                  </template>
+
+                  <el-button link type="primary" @click="openOrderDetails(row)">
+                    <el-icon><Document /></el-icon> 订单详情
+                  </el-button>
+                </div>
+              </template>
+            </el-table-column>
+          </el-table>
+
+          <div class="pagination-wrapper">
+            <el-pagination
+              v-model:current-page="currentPage"
+              :page-size="pageSize"
+              :total="total"
+              background
+              layout="total, prev, pager, next, jumper"
+              @current-change="handleCurrentChange"
+            />
+          </div>
+        </template>
       </div>
 
       <el-dialog
@@ -140,6 +203,13 @@
           ref="formRef"
           class="custom-form"
         >
+          <el-row :gutter="40">
+            <el-col :span="24">
+              <el-form-item label="意向车辆">
+                <el-input :model-value="preferredVehicleDisplay" disabled />
+              </el-form-item>
+            </el-col>
+          </el-row>
           <el-row :gutter="40">
             <el-col :span="12">
               <el-form-item label="用车人" prop="username">
@@ -297,23 +367,32 @@
           </div>
 
           <div class="info-card vehicle-section">
-            <div class="card-title">分配车辆信息</div>
+            <div class="card-title">{{ Number(currentOrder.status || 0) >= 60 ? '已分配车辆信息' : '意向车辆信息' }}</div>
             <div v-if="vehicleInfo" class="vehicle-card">
-              <div class="plate-number">{{ vehicleInfo.license }}</div>
+              <div class="plate-number">{{ vehicleInfo.license || '--' }}</div>
               <div class="vehicle-specs">
-                <span
-                  ><el-icon><Van /></el-icon> {{ vehicleInfo.brand }} {{ vehicleInfo.model }}</span
-                >
+                <span><el-icon><Van /></el-icon> ID：{{ vehicleInfo.id || currentOrder.vehicleId || '--' }}</span>
                 <span class="divider">|</span>
-                <span>颜色：{{ vehicleInfo.color }}</span>
+                <span>品牌：{{ vehicleInfo.brand || '--' }}</span>
+              </div>
+              <div class="vehicle-specs">
+                <span>颜色：{{ getVehicleColorText(vehicleInfo.color) }}</span>
+                <span class="divider">|</span>
+                <span>车型：{{ getVehicleTypeText(vehicleInfo.type) }}</span>
               </div>
             </div>
-            <div v-else-if="currentOrder.status < 60" class="vehicle-placeholder">
-              <el-icon class="is-loading"><Loading /></el-icon>
-              <span v-if="currentOrder.status < 50">审批通过后将为您调度车辆...</span>
-              <span v-else>系统正在为您排期分配空闲车辆...</span>
+            <div
+              v-else-if="currentOrder.vehicleId && Number(currentOrder.status || 0) < 60"
+              class="vehicle-placeholder"
+            >
+              <el-icon><Clock /></el-icon>
+              <span>已记录意向车辆ID：{{ currentOrder.vehicleId }}，最终分配以审批后调度结果为准</span>
             </div>
-            <div v-else class="vehicle-placeholder error">暂无车辆数据</div>
+            <div v-else-if="Number(currentOrder.status || 0) < 60" class="vehicle-placeholder">
+              <el-icon class="is-loading"><Loading /></el-icon>
+              <span>尚未选择意向车辆</span>
+            </div>
+            <div v-else class="vehicle-placeholder error">已分配车辆信息暂未同步，请稍后重试</div>
           </div>
 
           <div class="info-card">
@@ -360,7 +439,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import {
   Document,
   User,
@@ -379,7 +458,8 @@ import {
 } from '@/api/application'
 import { selectAuditList } from '@/api/audit'
 import { selectVehicle } from '@/api/vehicle'
-import { ElMessage, ElMessageBox, ElConfigProvider } from 'element-plus'
+import { selectDictOptionByCode } from '@/api/dictoption'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import zhCn from 'element-plus/es/locale/lang/zh-cn'
 
 const locale = zhCn
@@ -400,6 +480,61 @@ const queryParams = reactive({
   userId: null,
 })
 
+const panelMode = ref('hall')
+const hallLoading = ref(false)
+const hallKeyword = ref('')
+const hallTypeFilter = ref('all')
+const hallVehicleList = ref([])
+
+const typeOptions = ref([])
+const colorOptions = ref([])
+const selectedApplyVehicle = ref(null)
+
+const DICT_FALLBACK = Object.freeze({
+  color: [
+    { label: '白', value: '10' },
+    { label: '灰', value: '20' },
+    { label: '黑', value: '30' },
+    { label: '银', value: '40' },
+    { label: '红', value: '50' },
+    { label: '绿', value: '60' },
+  ],
+  type: [
+    { label: '轿车', value: '10' },
+    { label: '客车', value: '20' },
+    { label: '货车', value: '30' },
+    { label: '挂车', value: '40' },
+  ],
+})
+
+const toKey = (value) => String(value == null ? '' : value).trim()
+const toOptionList = (list, fallback) => {
+  const normalized = Array.isArray(list)
+    ? list
+        .map((item) => ({
+          label: String(item?.label || '').trim(),
+          value: toKey(item?.value),
+          sort: Number(item?.sort || 0),
+        }))
+        .filter((item) => item.label && item.value)
+        .sort((a, b) => a.sort - b.sort)
+    : []
+  return normalized.length ? normalized : fallback
+}
+
+const buildLabelMap = (list) => {
+  const map = {}
+  ;(list || []).forEach((item) => {
+    const key = toKey(item?.value)
+    if (!key) return
+    map[key] = String(item?.label || '').trim()
+  })
+  return map
+}
+
+const typeLabelMap = computed(() => buildLabelMap(typeOptions.value))
+const colorLabelMap = computed(() => buildLabelMap(colorOptions.value))
+
 const dialogVisible = ref(false)
 const submitLoading = ref(false)
 const formRef = ref(null)
@@ -415,6 +550,7 @@ const appForm = reactive({
   imgUrl: '',
   reason: '',
   remark: '',
+  vehicleId: null,
 })
 
 const licensePreviewUrl = ref('')
@@ -440,26 +576,137 @@ const currentOrder = ref({})
 const vehicleInfo = ref(null)
 const auditProcessList = ref([])
 
-onMounted(() => {
+const getVehicleTypeText = (value) => {
+  const key = toKey(value)
+  return typeLabelMap.value[key] || key || '--'
+}
+
+const getVehicleColorText = (value) => {
+  const key = toKey(value)
+  return colorLabelMap.value[key] || key || '--'
+}
+
+const isVehicleIdle = (item) => toKey(item?.status) === '1'
+const getHallStatusText = (item) => (isVehicleIdle(item) ? '空闲中' : '占用中')
+
+const filteredHallVehicles = computed(() => {
+  const keyword = String(hallKeyword.value || '').trim().toLowerCase()
+  const selectedType = toKey(hallTypeFilter.value)
+
+  return (hallVehicleList.value || []).filter((item) => {
+    if (selectedType !== 'all' && toKey(item?.type) !== selectedType) {
+      return false
+    }
+    if (!keyword) {
+      return true
+    }
+    const text = [
+      item?.id,
+      item?.license,
+      item?.brand,
+      getVehicleTypeText(item?.type),
+      getVehicleColorText(item?.color),
+      getHallStatusText(item),
+    ]
+      .map((v) => String(v || '').toLowerCase())
+      .join(' ')
+    return text.includes(keyword)
+  })
+})
+
+const availableHallCount = computed(
+  () => filteredHallVehicles.value.filter((item) => isVehicleIdle(item)).length,
+)
+
+const preferredVehicleDisplay = computed(() => {
+  if (!appForm.vehicleId) {
+    return '请先在车辆大厅选择车辆'
+  }
+  const matched =
+    selectedApplyVehicle.value && Number(selectedApplyVehicle.value.id) === Number(appForm.vehicleId)
+      ? selectedApplyVehicle.value
+      : null
+  if (!matched) {
+    return `车辆ID：${appForm.vehicleId}`
+  }
+  const license = matched.license || `车辆-${matched.id}`
+  const brand = matched.brand || '未知品牌'
+  const color = getVehicleColorText(matched.color)
+  return `${license}（ID:${matched.id}，${brand}，${color}）`
+})
+
+const loadVehicleDictOptions = async () => {
+  const [colorRes, typeRes] = await Promise.allSettled([
+    selectDictOptionByCode('101'),
+    selectDictOptionByCode('103'),
+  ])
+
+  colorOptions.value =
+    colorRes.status === 'fulfilled'
+      ? toOptionList(colorRes.value?.data, DICT_FALLBACK.color)
+      : DICT_FALLBACK.color
+  typeOptions.value =
+    typeRes.status === 'fulfilled'
+      ? toOptionList(typeRes.value?.data, DICT_FALLBACK.type)
+      : DICT_FALLBACK.type
+}
+
+const fetchVehicleHall = async () => {
+  hallLoading.value = true
+  try {
+    const res = await selectVehicle({})
+    const list = (res?.data || []).map((item) => ({
+      ...item,
+      id: item?.id,
+      status: toKey(item?.status),
+      type: toKey(item?.type),
+      color: toKey(item?.color),
+    }))
+    hallVehicleList.value = list.sort((a, b) => {
+      const aIdle = isVehicleIdle(a) ? 1 : 0
+      const bIdle = isVehicleIdle(b) ? 1 : 0
+      if (aIdle !== bIdle) {
+        return bIdle - aIdle
+      }
+      return Number(a?.id || 0) - Number(b?.id || 0)
+    })
+  } catch (error) {
+    console.error('获取车辆大厅失败', error)
+    hallVehicleList.value = []
+  } finally {
+    hallLoading.value = false
+  }
+}
+
+onMounted(async () => {
   const userInfoStr = localStorage.getItem('userInfo')
   if (userInfoStr) {
     try {
       const userInfo = JSON.parse(userInfoStr)
       currentUserId.value = userInfo.id
       appForm.username = userInfo.username
-
-      // 🍎 核心修改：权限收紧！只有 level 为 '99' 的车管调度员才能看到调度中心
       if (String(userInfo.level) === '99') {
         isAdmin.value = true
       }
-
       queryParams.userId = userInfo.id
     } catch (e) {
       console.error('解析用户信息失败', e)
     }
   }
+
+  await loadVehicleDictOptions()
+  await fetchVehicleHall()
   fetchList()
 })
+
+const handlePanelChange = (mode) => {
+  if (mode === 'orders') {
+    currentPage.value = 1
+    fetchList()
+    return
+  }
+  fetchVehicleHall()
+}
 
 const handleTabChange = (tabName) => {
   currentPage.value = 1
@@ -472,8 +719,14 @@ const handleTabChange = (tabName) => {
 }
 
 const handleSearch = () => {
+  if (panelMode.value !== 'orders') return
   currentPage.value = 1
   fetchList()
+}
+
+const handleHallSearch = () => {
+  if (panelMode.value !== 'hall') return
+  hallKeyword.value = String(hallKeyword.value || '').trim()
 }
 
 const fetchList = async () => {
@@ -508,7 +761,12 @@ const fetchList = async () => {
       })
     }
 
-    allData.value = rawData
+    allData.value = rawData.map((item) => ({
+      ...item,
+      status: toKey(item?.status),
+      type: toKey(item?.type),
+      color: toKey(item?.color),
+    }))
     total.value = allData.value.length
     updatePageData()
   } catch (error) {
@@ -601,8 +859,25 @@ const handleAvatarChange = async (uploadFile) => {
   }
 }
 
-const handleAdd = () => {
+const openApplyByVehicle = (item) => {
+  if (!isVehicleIdle(item)) {
+    ElMessage.warning('当前车辆处于占用状态，暂不可申请')
+    return
+  }
+  handleAdd(item)
+}
+
+const handleAdd = (vehicle = null) => {
   const usernameCache = appForm.username
+  const selected = vehicle
+    ? {
+        ...vehicle,
+        status: toKey(vehicle.status),
+        type: toKey(vehicle.type),
+        color: toKey(vehicle.color),
+      }
+    : null
+  selectedApplyVehicle.value = selected
   resetLicenseUploadState()
   Object.assign(appForm, {
     id: null,
@@ -616,6 +891,7 @@ const handleAdd = () => {
     imgUrl: '',
     reason: '',
     remark: '',
+    vehicleId: selected?.id || null,
   })
   dialogVisible.value = true
   if (formRef.value) formRef.value.clearValidate()
@@ -625,6 +901,10 @@ const submitForm = () => {
   if (!formRef.value) return
   if (uploadingLicense.value) {
     ElMessage.warning('驾照仍在上传中，请稍候再提交')
+    return
+  }
+  if (!appForm.vehicleId) {
+    ElMessage.warning('请先在车辆大厅选择车辆后再提交申请')
     return
   }
   formRef.value.validate(async (valid) => {
@@ -641,6 +921,8 @@ const submitForm = () => {
         ElMessage.success('申请提交成功！审批流已启动。')
         dialogVisible.value = false
         resetLicenseUploadState()
+        selectedApplyVehicle.value = null
+        fetchVehicleHall()
         if (activeTab.value === 'all') {
           activeTab.value = 'mine'
           handleTabChange('mine')
@@ -667,6 +949,7 @@ const handleCancel = (row) => {
       await cancelApplication(row.id || row.user_id)
       ElMessage.success('撤销成功！')
       fetchList()
+      fetchVehicleHall()
     })
     .catch(() => {})
 }
@@ -685,6 +968,7 @@ const submitDistribute = async () => {
     ElMessage.success('调度发车成功！')
     distributeVisible.value = false
     fetchList()
+    fetchVehicleHall()
   } catch (error) {
     console.error('分配失败:', error)
   } finally {
@@ -704,6 +988,7 @@ const handleBack = (row) => {
       await backVehicle(row.id || row.user_id, row.vehicleId)
       ElMessage.success('还车成功，流程完结！')
       fetchList()
+      fetchVehicleHall()
     })
     .catch(() => {})
 }
@@ -750,9 +1035,9 @@ const getAppStatusText = (status) => {
     20: '已撤销',
     30: '审核中',
     40: '已驳回',
-    50: '待分配',
-    60: '使用中',
-    70: '已完结',
+    50: '已审核',
+    60: '已分配用车',
+    70: '工单结束',
   }
   return map[status] || '未知'
 }
@@ -849,11 +1134,15 @@ const getTimelineNodeColor = (status) => {
 .table-header-actions {
   display: flex;
   justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
   margin-bottom: 20px;
 }
 .header-left {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 16px;
 }
 
@@ -878,6 +1167,97 @@ const getTimelineNodeColor = (status) => {
   border-color: transparent;
   color: #1d1d1f;
   border-radius: 8px;
+}
+
+.hall-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.hall-type-switch {
+  max-width: 100%;
+}
+
+.hall-summary {
+  font-size: 13px;
+  color: #606266;
+  background-color: #f5f5f7;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 999px;
+  padding: 6px 12px;
+}
+
+.hall-grid {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  align-content: start;
+  padding-right: 4px;
+}
+
+.hall-vehicle-card {
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 14px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 170px;
+  background: linear-gradient(160deg, #f5fbff 0%, #f2fcf7 100%);
+  transition: all 0.2s ease;
+}
+
+.hall-vehicle-card:hover {
+  box-shadow: 0 8px 18px rgba(0, 122, 255, 0.08);
+  border-color: rgba(0, 122, 255, 0.28);
+}
+
+.hall-vehicle-card.unavailable {
+  background: #f5f5f7;
+  opacity: 0.72;
+}
+
+.hall-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.hall-license {
+  font-size: 22px;
+  font-weight: 700;
+  color: #1d1d1f;
+  letter-spacing: 0.4px;
+}
+
+.hall-meta {
+  font-size: 14px;
+  color: #1d1d1f;
+  line-height: 1.4;
+}
+
+.hall-meta.light {
+  color: #86868b;
+}
+
+.hall-apply-btn {
+  margin-top: auto;
+  height: 38px;
+  border-radius: 10px;
+  font-weight: 600;
+}
+
+.hall-empty {
+  grid-column: 1 / -1;
+  align-self: center;
 }
 
 .upload-container {

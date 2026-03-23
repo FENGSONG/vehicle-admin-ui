@@ -9,6 +9,19 @@ import ApplicationList from '@/views/ApplicationList.vue'
 // 🍎 新增：引入审批待办页面 (请确保 views 目录下有这个文件)
 import AuditList from '@/views/AuditList.vue'
 
+const getCurrentUserLevel = () => {
+  try {
+    const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
+    return String(userInfo.level || '').trim()
+  } catch {
+    return ''
+  }
+}
+
+const getDefaultLayoutPath = () => {
+  return getCurrentUserLevel() === '99' ? '/layout/dashboard' : '/layout/application'
+}
+
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
@@ -25,7 +38,7 @@ const router = createRouter({
       path: '/layout',
       name: 'layout',
       component: Layout,
-      redirect: '/layout/dashboard', // 访问 /layout 时，默认重定向到数据大盘
+      redirect: () => getDefaultLayoutPath(),
       children: [
         //  子路由配置
         {
@@ -64,6 +77,14 @@ const router = createRouter({
       ],
     },
   ],
+})
+
+router.beforeEach((to, from, next) => {
+  if (to.path === '/layout/dashboard' && getCurrentUserLevel() !== '99') {
+    next('/layout/application')
+    return
+  }
+  next()
 })
 
 export default router
