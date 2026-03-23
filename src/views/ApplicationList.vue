@@ -151,6 +151,11 @@
               show-overflow-tooltip
               align="center"
             />
+            <el-table-column label="车辆信息" min-width="170" show-overflow-tooltip align="center">
+              <template #default="{ row }">
+                <span>{{ getOrderVehicleText(row) }}</span>
+              </template>
+            </el-table-column>
             <el-table-column prop="startTime" label="开始时间" min-width="155" align="center" />
             <el-table-column prop="endTime" label="结束时间" min-width="155" align="center" />
 
@@ -324,11 +329,31 @@
       </el-dialog>
 
       <el-dialog v-model="distributeVisible" title="调度发车" width="400px" destroy-on-close>
-        <el-form label-position="top">
-          <el-form-item label="请选择要分配的车辆 ID">
-            <el-input v-model="selectedVehicleId" placeholder="请输入空闲车辆的ID" />
-          </el-form-item>
-        </el-form>
+        <div v-loading="distributeLoading">
+          <el-form label-position="top">
+            <el-form-item label="请选择要分配的车辆">
+              <el-select
+                v-model="selectedVehicleId"
+                placeholder="请选择空闲车辆"
+                style="width: 100%"
+                filterable
+                clearable
+              >
+                <el-option
+                  v-for="item in distributeVehicleOptions"
+                  :key="`dist-${item.id}`"
+                  :label="item.label"
+                  :value="item.id"
+                />
+              </el-select>
+            </el-form-item>
+          </el-form>
+          <el-empty
+            v-if="!distributeLoading && distributeVehicleOptions.length === 0"
+            description="当前时间段无可分配车辆"
+            :image-size="70"
+          />
+        </div>
         <template #footer>
           <span class="dialog-footer">
             <el-button @click="distributeVisible = false">取消</el-button>
@@ -336,6 +361,7 @@
               type="primary"
               class="mac-button-blue"
               @click="submitDistribute"
+              :disabled="distributeLoading || distributeVehicleOptions.length === 0"
               :loading="submitLoading"
               >确认发车</el-button
             >
@@ -602,7 +628,9 @@ const rules = {
 
 const distributeVisible = ref(false)
 const currentApplicationId = ref(null)
-const selectedVehicleId = ref('')
+const selectedVehicleId = ref(null)
+const distributeLoading = ref(false)
+const distributeVehicleOptions = ref([])
 
 const drawerVisible = ref(false)
 const drawerLoading = ref(false)
@@ -618,6 +646,24 @@ const getVehicleTypeText = (value) => {
 const getVehicleColorText = (value) => {
   const key = toKey(value)
   return colorLabelMap.value[key] || key || '--'
+}
+
+const vehicleLabelMap = computed(() => {
+  const map = {}
+  ;(hallVehicleList.value || []).forEach((item) => {
+    if (!item || item.id == null) return
+    map[String(item.id)] = item
+  })
+  return map
+})
+
+const getOrderVehicleText = (row) => {
+  const vehicleId = row?.vehicleId
+  if (!vehicleId) return '--'
+  const vehicle = vehicleLabelMap.value[String(vehicleId)]
+  if (!vehicle) return `车辆ID：${vehicleId}`
+  const prefix = Number(row?.status || 0) >= 60 ? '已分配' : '意向'
+  return `${prefix}：${vehicle.license || `车辆-${vehicleId}`}（ID:${vehicleId}）`
 }
 
 const isVehicleIdle = (item) => toKey(item?.status) === '1'
@@ -1020,14 +1066,82 @@ const handleCancel = (row) => {
     .catch(() => {})
 }
 
-const openDistributeDialog = (row) => {
+const toTimestamp = (value) => {
+  const time = new Date(value).getTime()
+  return Number.isNaN(time) ? 0 : time
+}
+
+const isTimeOverlap = (leftStart, leftEnd, rightStart, rightEnd) => {
+  const ls = toTimestamp(leftStart)
+  const le = toTimestamp(leftEnd)
+  const rs = toTimestamp(rightStart)
+  const re = toTimestamp(rightEnd)
+  if (!ls || !le || !rs || !re) return false
+  return le > rs && ls < re
+}
+
+const buildDistributeVehicleOptions = async (row) => {
+  distributeLoading.value = true
+  try {
+    const [vehicleRes, appRes] = await Promise.all([selectVehicle({}), selectApplication({})])
+    const vehicles = (vehicleRes?.data || []).map((item) => ({
+      ...item,
+      id: item?.id,
+      status: toKey(item?.status),
+      color: toKey(item?.color),
+    }))
+    const apps = (appRes?.data || []).map((item) => ({
+      ...item,
+      status: toKey(item?.status),
+    }))
+
+    const occupiedVehicleIdSet = new Set()
+    apps.forEach((item) => {
+      if (toKey(item?.status) !== '60' || !item?.vehicleId) return
+      if (Number(item?.id) === Number(row?.id)) return
+      if (isTimeOverlap(row?.startTime, row?.endTime, item?.startTime, item?.endTime)) {
+        occupiedVehicleIdSet.add(Number(item.vehicleId))
+      }
+    })
+
+    const options = vehicles
+      .filter((item) => toKey(item.status) === '1')
+      .filter((item) => !occupiedVehicleIdSet.has(Number(item.id)))
+      .sort((a, b) => Number(a?.id || 0) - Number(b?.id || 0))
+      .map((item) => ({
+        id: item.id,
+        label: `${item.license || `车辆-${item.id}`}｜ID:${item.id}｜${item.brand || '--'}·${getVehicleColorText(item.color)}`,
+      }))
+
+    distributeVehicleOptions.value = options
+  } catch (error) {
+    console.error('加载可分配车辆失败', error)
+    distributeVehicleOptions.value = []
+  } finally {
+    distributeLoading.value = false
+  }
+}
+
+const openDistributeDialog = async (row) => {
   currentApplicationId.value = row.id || row.user_id
-  selectedVehicleId.value = ''
+  selectedVehicleId.value = null
+  distributeVehicleOptions.value = []
   distributeVisible.value = true
+  await buildDistributeVehicleOptions(row)
+
+  const preferredVehicleId = Number(row?.vehicleId || 0)
+  if (preferredVehicleId) {
+    const matched = distributeVehicleOptions.value.find((item) => Number(item.id) === preferredVehicleId)
+    if (matched) {
+      selectedVehicleId.value = matched.id
+      return
+    }
+  }
+  selectedVehicleId.value = distributeVehicleOptions.value[0]?.id || null
 }
 
 const submitDistribute = async () => {
-  if (!selectedVehicleId.value) return ElMessage.warning('请输入车辆ID')
+  if (!selectedVehicleId.value) return ElMessage.warning('请选择可分配车辆')
   submitLoading.value = true
   try {
     await distributeVehicle(currentApplicationId.value, selectedVehicleId.value)

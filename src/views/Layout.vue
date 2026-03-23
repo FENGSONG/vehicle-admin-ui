@@ -59,6 +59,7 @@ import {
   MapLocation,
   Document,
   Stamp,
+  Grid,
 } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
@@ -148,6 +149,13 @@ const allMenuItems = [
     path: '/layout/audit',
     // 各级领导和车管能看，基层员工(10)不能看
     allowedRoles: ['20', '30', '40', '50', '99'],
+  },
+  {
+    title: '字典中心',
+    icon: Grid,
+    path: '/layout/dict-center',
+    // 仅车管调度员可维护字典
+    allowedRoles: ['99'],
   },
 ]
 

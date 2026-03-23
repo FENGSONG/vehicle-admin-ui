@@ -8,6 +8,7 @@ import UserList from '@/views/UserList.vue'
 import ApplicationList from '@/views/ApplicationList.vue'
 // 🍎 新增：引入审批待办页面 (请确保 views 目录下有这个文件)
 import AuditList from '@/views/AuditList.vue'
+import DictCenter from '@/views/DictCenter.vue'
 
 const getCurrentUserLevel = () => {
   try {
@@ -74,6 +75,11 @@ const router = createRouter({
           name: 'AuditList',
           component: AuditList,
         },
+        {
+          path: 'dict-center',
+          name: 'DictCenter',
+          component: DictCenter,
+        },
       ],
     },
   ],
@@ -81,6 +87,10 @@ const router = createRouter({
 
 router.beforeEach((to, from, next) => {
   if (to.path === '/layout/dashboard' && getCurrentUserLevel() !== '99') {
+    next('/layout/application')
+    return
+  }
+  if (to.path === '/layout/dict-center' && getCurrentUserLevel() !== '99') {
     next('/layout/application')
     return
   }
