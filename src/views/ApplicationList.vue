@@ -31,6 +31,21 @@
           </div>
 
           <div v-if="panelMode === 'orders'" class="search-box">
+            <el-select
+              v-model="queryParams.status"
+              clearable
+              placeholder="全部状态"
+              class="mac-status-select"
+              @change="handleSearch"
+              @clear="handleSearch"
+            >
+              <el-option
+                v-for="item in orderStatusOptions"
+                :key="`status-${item.value}`"
+                :label="item.label"
+                :value="item.value"
+              />
+            </el-select>
             <el-input
               v-model="queryParams.keyword"
               :placeholder="activeTab === 'mine' ? '搜索我的订单...' : '搜索全公司订单...'"
@@ -65,7 +80,11 @@
                 {{ item.label }}
               </el-radio-button>
             </el-radio-group>
-            <div class="hall-summary">可申请 {{ availableHallCount }} / {{ filteredHallVehicles.length }}</div>
+            <div class="hall-toolbar-right">
+              <div class="hall-summary">可申请 {{ availableHallCount }} / {{ filteredHallVehicles.length }}</div>
+              <div class="hall-refresh-time">更新时间：{{ hallRefreshText }}</div>
+              <el-button class="mac-button-gray" @click="fetchVehicleHall()">刷新大厅</el-button>
+            </div>
           </div>
 
           <div class="hall-grid" v-loading="hallLoading">
@@ -439,7 +458,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue'
 import {
   Document,
   User,
@@ -477,6 +496,7 @@ const currentUserId = ref(null)
 
 const queryParams = reactive({
   keyword: '',
+  status: '',
   userId: null,
 })
 
@@ -534,6 +554,20 @@ const buildLabelMap = (list) => {
 
 const typeLabelMap = computed(() => buildLabelMap(typeOptions.value))
 const colorLabelMap = computed(() => buildLabelMap(colorOptions.value))
+
+const orderStatusOptions = Object.freeze([
+  { label: '全部状态', value: '' },
+  { label: '已发起', value: '10' },
+  { label: '已撤销', value: '20' },
+  { label: '审核中', value: '30' },
+  { label: '已驳回', value: '40' },
+  { label: '已审核', value: '50' },
+  { label: '已分配用车', value: '60' },
+  { label: '工单结束', value: '70' },
+])
+
+const hallLastRefreshAt = ref(null)
+let hallRefreshTimer = null
 
 const dialogVisible = ref(false)
 const submitLoading = ref(false)
@@ -635,6 +669,15 @@ const preferredVehicleDisplay = computed(() => {
   return `${license}（ID:${matched.id}，${brand}，${color}）`
 })
 
+const hallRefreshText = computed(() => {
+  if (!hallLastRefreshAt.value) {
+    return '--'
+  }
+  const date = hallLastRefreshAt.value
+  const pad = (num) => String(num).padStart(2, '0')
+  return `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
+})
+
 const loadVehicleDictOptions = async () => {
   const [colorRes, typeRes] = await Promise.allSettled([
     selectDictOptionByCode('101'),
@@ -651,8 +694,10 @@ const loadVehicleDictOptions = async () => {
       : DICT_FALLBACK.type
 }
 
-const fetchVehicleHall = async () => {
-  hallLoading.value = true
+const fetchVehicleHall = async (showLoading = true) => {
+  if (showLoading) {
+    hallLoading.value = true
+  }
   try {
     const res = await selectVehicle({})
     const list = (res?.data || []).map((item) => ({
@@ -670,11 +715,14 @@ const fetchVehicleHall = async () => {
       }
       return Number(a?.id || 0) - Number(b?.id || 0)
     })
+    hallLastRefreshAt.value = new Date()
   } catch (error) {
     console.error('获取车辆大厅失败', error)
     hallVehicleList.value = []
   } finally {
-    hallLoading.value = false
+    if (showLoading) {
+      hallLoading.value = false
+    }
   }
 }
 
@@ -697,6 +745,19 @@ onMounted(async () => {
   await loadVehicleDictOptions()
   await fetchVehicleHall()
   fetchList()
+
+  hallRefreshTimer = window.setInterval(() => {
+    if (panelMode.value === 'hall') {
+      fetchVehicleHall(false)
+    }
+  }, 30000)
+})
+
+onBeforeUnmount(() => {
+  if (hallRefreshTimer) {
+    clearInterval(hallRefreshTimer)
+    hallRefreshTimer = null
+  }
 })
 
 const handlePanelChange = (mode) => {
@@ -741,6 +802,11 @@ const fetchList = async () => {
 
     if (activeTab.value === 'mine') {
       rawData = rawData.filter((item) => Number(item.userId) === Number(currentUserId.value))
+    }
+
+    const selectedStatus = toKey(queryParams.status)
+    if (selectedStatus) {
+      rawData = rawData.filter((item) => toKey(item?.status) === selectedStatus)
     }
 
     const keyword = String(queryParams.keyword || '').trim().toLowerCase()
@@ -1150,6 +1216,9 @@ const getTimelineNodeColor = (status) => {
   display: flex;
   gap: 12px;
 }
+.mac-status-select {
+  width: 140px;
+}
 .mac-search-input {
   width: 280px;
 }
@@ -1182,6 +1251,12 @@ const getTimelineNodeColor = (status) => {
   max-width: 100%;
 }
 
+.hall-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .hall-summary {
   font-size: 13px;
   color: #606266;
@@ -1189,6 +1264,11 @@ const getTimelineNodeColor = (status) => {
   border: 1px solid rgba(0, 0, 0, 0.08);
   border-radius: 999px;
   padding: 6px 12px;
+}
+
+.hall-refresh-time {
+  font-size: 12px;
+  color: #86868b;
 }
 
 .hall-grid {
