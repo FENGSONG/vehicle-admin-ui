@@ -502,7 +502,7 @@ import {
   backVehicle,
 } from '@/api/application'
 import { selectAuditList } from '@/api/audit'
-import { selectVehicle } from '@/api/vehicle'
+import { selectVehicle, selectAvailableVehicle } from '@/api/vehicle'
 import { selectDictOptionByCode } from '@/api/dictoption'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import zhCn from 'element-plus/es/locale/lang/zh-cn'
@@ -1051,6 +1051,8 @@ const submitForm = () => {
 }
 
 const handleCancel = (row) => {
+  const applicationId = resolveApplicationId(row)
+  if (!applicationId) return ElMessage.error('申请单ID缺失，无法撤销')
   ElMessageBox.confirm(`确定要撤销此申请单吗？`, '确认撤销', {
     confirmButtonText: '确定撤销',
     cancelButtonText: '取消',
@@ -1058,7 +1060,7 @@ const handleCancel = (row) => {
     center: true,
   })
     .then(async () => {
-      await cancelApplication(row.id || row.user_id)
+      await cancelApplication(applicationId)
       ElMessage.success('撤销成功！')
       fetchList()
       fetchVehicleHall()
@@ -1066,47 +1068,26 @@ const handleCancel = (row) => {
     .catch(() => {})
 }
 
-const toTimestamp = (value) => {
-  const time = new Date(value).getTime()
-  return Number.isNaN(time) ? 0 : time
-}
-
-const isTimeOverlap = (leftStart, leftEnd, rightStart, rightEnd) => {
-  const ls = toTimestamp(leftStart)
-  const le = toTimestamp(leftEnd)
-  const rs = toTimestamp(rightStart)
-  const re = toTimestamp(rightEnd)
-  if (!ls || !le || !rs || !re) return false
-  return le > rs && ls < re
-}
-
 const buildDistributeVehicleOptions = async (row) => {
   distributeLoading.value = true
   try {
-    const [vehicleRes, appRes] = await Promise.all([selectVehicle({}), selectApplication({})])
-    const vehicles = (vehicleRes?.data || []).map((item) => ({
+    const startTime = String(row?.startTime || '').trim()
+    const endTime = String(row?.endTime || '').trim()
+    if (!startTime || !endTime) {
+      distributeVehicleOptions.value = []
+      ElMessage.warning('当前申请单时间范围缺失，无法加载可分配车辆')
+      return
+    }
+
+    const availableRes = await selectAvailableVehicle({ startTime, endTime })
+    const vehicles = (availableRes?.data || []).map((item) => ({
       ...item,
       id: item?.id,
       status: toKey(item?.status),
       color: toKey(item?.color),
     }))
-    const apps = (appRes?.data || []).map((item) => ({
-      ...item,
-      status: toKey(item?.status),
-    }))
-
-    const occupiedVehicleIdSet = new Set()
-    apps.forEach((item) => {
-      if (toKey(item?.status) !== '60' || !item?.vehicleId) return
-      if (Number(item?.id) === Number(row?.id)) return
-      if (isTimeOverlap(row?.startTime, row?.endTime, item?.startTime, item?.endTime)) {
-        occupiedVehicleIdSet.add(Number(item.vehicleId))
-      }
-    })
 
     const options = vehicles
-      .filter((item) => toKey(item.status) === '1')
-      .filter((item) => !occupiedVehicleIdSet.has(Number(item.id)))
       .sort((a, b) => Number(a?.id || 0) - Number(b?.id || 0))
       .map((item) => ({
         id: item.id,
@@ -1123,7 +1104,9 @@ const buildDistributeVehicleOptions = async (row) => {
 }
 
 const openDistributeDialog = async (row) => {
-  currentApplicationId.value = row.id || row.user_id
+  const applicationId = resolveApplicationId(row)
+  if (!applicationId) return ElMessage.error('申请单ID缺失，无法分配')
+  currentApplicationId.value = applicationId
   selectedVehicleId.value = null
   distributeVehicleOptions.value = []
   distributeVisible.value = true
@@ -1157,6 +1140,8 @@ const submitDistribute = async () => {
 }
 
 const handleBack = (row) => {
+  const applicationId = resolveApplicationId(row)
+  if (!applicationId) return ElMessage.error('申请单ID缺失，无法还车')
   if (!row.vehicleId) return ElMessage.error('该申请单未绑定车辆，无法还车')
   ElMessageBox.confirm(`确认归还车辆【ID: ${row.vehicleId}】并完结此单据吗？`, '确认还车', {
     confirmButtonText: '确认归还',
@@ -1165,7 +1150,7 @@ const handleBack = (row) => {
     center: true,
   })
     .then(async () => {
-      await backVehicle(row.id || row.user_id, row.vehicleId)
+      await backVehicle(applicationId, row.vehicleId)
       ElMessage.success('还车成功，流程完结！')
       fetchList()
       fetchVehicleHall()
@@ -1180,7 +1165,17 @@ const formatOrderNo = (id, dateStr) => {
   return prefix + String(id).padStart(3, '0')
 }
 
+const resolveApplicationId = (row) => {
+  const id = Number(row?.id || 0)
+  return id > 0 ? id : 0
+}
+
 const openOrderDetails = async (row) => {
+  const applicationId = resolveApplicationId(row)
+  if (!applicationId) {
+    ElMessage.error('申请单ID缺失，无法查看详情')
+    return
+  }
   currentOrder.value = row
   drawerVisible.value = true
   drawerLoading.value = true
@@ -1188,7 +1183,7 @@ const openOrderDetails = async (row) => {
   auditProcessList.value = []
 
   try {
-    const requests = [selectAuditList({ applicationId: row.id || row.user_id })]
+    const requests = [selectAuditList({ applicationId })]
     if (row.vehicleId) requests.push(selectVehicle({ id: row.vehicleId }))
 
     const results = await Promise.all(requests)
@@ -1234,7 +1229,7 @@ const getAppStatusTagType = (status) => {
   return map[status] || ''
 }
 const getAuditStatusText = (status) => {
-  const map = { 10: '正在审批', 20: '排队中', 30: '已同意', 40: '已驳回' }
+  const map = { 10: '待我审核', 20: '待他人审核', 30: '已审核', 40: '已驳回' }
   return map[status] || '未知'
 }
 const getTimelineNodeType = (status) => {

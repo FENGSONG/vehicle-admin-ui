@@ -2,7 +2,7 @@
   <div class="mac-page-container">
     <div class="page-header-container">
       <h1 class="mac-page-title">
-        {{ currentUserLevel === '99' ? '全局审批监控' : '我的审批待办' }}
+        {{ isDispatcher ? '全局审批监控' : '我的审批待办' }}
       </h1>
     </div>
 
@@ -11,6 +11,16 @@
     <div class="mac-table-card">
       <div class="table-header-actions">
         <div class="search-box">
+          <el-select
+            v-model="queryParams.auditStatus"
+            clearable
+            placeholder="审批状态"
+            class="mac-status-select"
+            @change="handleSearch"
+            @clear="handleSearch"
+          >
+            <el-option v-for="item in statusOptions" :key="`audit-status-${item.value}`" :label="item.label" :value="item.value" />
+          </el-select>
           <el-input
             v-model="queryParams.keyword"
             placeholder="搜索申请事由..."
@@ -47,27 +57,30 @@
 
         <el-table-column label="审批状态" width="120" align="center">
           <template #default="{ row }">
-            <el-tag
-              :type="getStatusType(row.auditStatus || row.status)"
-              size="small"
-              effect="light"
-            >
-              {{ getStatusText(row.auditStatus || row.status) }}
+            <el-tag :type="getStatusType(row.auditStatus)" size="small" effect="light">
+              {{ getStatusText(row.auditStatus) }}
             </el-tag>
           </template>
         </el-table-column>
 
-        <el-table-column label="审批操作" width="200" fixed="right" align="center">
+        <el-table-column label="审批操作" width="260" fixed="right" align="center">
           <template #default="{ row }">
-            <template v-if="canOperate(row)">
-              <el-button link type="success" @click="handlePass(row)">
-                <el-icon><Check /></el-icon> 同意
+            <div class="action-btn-group">
+              <template v-if="canOperate(row)">
+                <el-button link type="success" @click="handlePass(row)">
+                  <el-icon><Check /></el-icon> 同意
+                </el-button>
+                <el-button link type="danger" @click="openRejectDialog(row)">
+                  <el-icon><Close /></el-icon> 驳回
+                </el-button>
+              </template>
+              <el-button v-if="canOverride(row)" link type="primary" @click="handleOverrideApprove(row)">
+                一键审核
               </el-button>
-              <el-button link type="danger" @click="openRejectDialog(row)">
-                <el-icon><Close /></el-icon> 驳回
-              </el-button>
-            </template>
-            <span v-else style="color: #909399; font-size: 13px">{{ getOperateHint(row) }}</span>
+              <span v-if="!canOperate(row) && !canOverride(row)" style="color: #909399; font-size: 13px">
+                {{ getOperateHint(row) }}
+              </span>
+            </div>
           </template>
         </el-table-column>
       </el-table>
@@ -108,10 +121,10 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { Check, Close } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { selectAuditList, updateAuditStatus } from '@/api/audit'
+import { selectAuditList, updateAuditStatus, overrideApprove } from '@/api/audit'
 
 const loading = ref(false)
 const allData = ref([])
@@ -120,13 +133,21 @@ const total = ref(0)
 const currentPage = ref(1)
 const pageSize = ref(8)
 
-// 🍎 新增：用于记录当前登录人的职级，控制页面标题展示
 const currentUserLevel = ref('')
 const currentUserId = ref(0)
+const isDispatcher = computed(() => currentUserLevel.value === '99')
+
+const statusOptions = Object.freeze([
+  { label: '全部状态', value: '' },
+  { label: '待我审核', value: '10' },
+  { label: '待他人审核', value: '20' },
+  { label: '已审核', value: '30' },
+  { label: '已驳回', value: '40' },
+])
 
 const queryParams = reactive({
   keyword: '',
-  auditStatus: '10',
+  auditStatus: '',
   auditUserId: null,
 })
 
@@ -138,23 +159,31 @@ const currentAuditSort = ref(null)
 const rejectReason = ref('')
 
 const getStatusText = (status) => {
-  const val = String(status)
+  const val = String(status || '').trim()
   if (val === '10') return '待我审核'
   if (val === '20') return '待他人审核'
-  if (val === '30') return '已通过'
+  if (val === '30') return '已审核'
   if (val === '40') return '已驳回'
   return '未知'
 }
 
 const getStatusType = (status) => {
-  const val = String(status)
+  const val = String(status || '').trim()
   if (val === '10') return 'warning'
   if (val === '30') return 'success'
   if (val === '40') return 'danger'
   return 'info'
 }
 
-const getRowAuditStatus = (row) => String(row?.auditStatus || row?.status || '').trim()
+const getRowAuditStatus = (row) => String(row?.auditStatus || '').trim()
+
+const applyQueryScope = () => {
+  if (isDispatcher.value) {
+    queryParams.auditUserId = null
+    return
+  }
+  queryParams.auditUserId = Number(currentUserId.value || 0) || null
+}
 
 const canOperate = (row) => {
   const auditStatus = getRowAuditStatus(row)
@@ -162,8 +191,17 @@ const canOperate = (row) => {
   return auditStatus === '10' && auditUserId > 0 && auditUserId === Number(currentUserId.value || 0)
 }
 
+const canOverride = (row) => {
+  if (!isDispatcher.value) return false
+  const auditStatus = getRowAuditStatus(row)
+  const applicationId = Number(row?.applicationId || 0)
+  return applicationId > 0 && (auditStatus === '10' || auditStatus === '20')
+}
+
 const getOperateHint = (row) => {
-  if (getRowAuditStatus(row) === '10') return '待他人处理'
+  const status = getRowAuditStatus(row)
+  if (status === '10') return '待他人处理'
+  if (status === '20') return '排队中'
   return '已处理'
 }
 
@@ -172,36 +210,38 @@ onMounted(() => {
   if (userInfoStr) {
     try {
       const userInfo = JSON.parse(userInfoStr)
-      currentUserLevel.value = String(userInfo.level)
+      currentUserLevel.value = String(userInfo.level || '').trim()
       currentUserId.value = Number(userInfo.id || 0)
-
-      // 🍎 核心修改：如果是车管(99)，不传 auditUserId，让他看到所有人的待办；
-      // 其他领导，只传自己的 ID，看自己的待办。
       if (currentUserLevel.value !== '99') {
-        queryParams.auditUserId = userInfo.id
+        queryParams.auditStatus = '10'
       }
     } catch (e) {
       console.error('解析用户信息失败', e)
     }
   }
-
+  applyQueryScope()
   fetchList()
 })
 
 const handleSearch = () => {
   currentPage.value = 1
+  applyQueryScope()
   fetchList()
 }
 
 const fetchList = async () => {
   loading.value = true
   try {
-    const res = await selectAuditList(queryParams)
-    let rawData = res.data || []
+    const requestParams = {}
+    if (queryParams.keyword) requestParams.keyword = queryParams.keyword
+    if (queryParams.auditStatus) requestParams.auditStatus = queryParams.auditStatus
+    if (queryParams.auditUserId != null) requestParams.auditUserId = queryParams.auditUserId
 
-    // 前端安全兜底过滤！强制只显示状态为“10（待审核）”的数据
-    allData.value = rawData.filter((item) => String(item.auditStatus || item.status) === '10')
-
+    const res = await selectAuditList(requestParams)
+    allData.value = (res?.data || []).map((item) => ({
+      ...item,
+      auditStatus: String(item?.auditStatus || '').trim(),
+    }))
     total.value = allData.value.length
     updatePageData()
   } catch (error) {
@@ -241,14 +281,33 @@ const handlePass = (row) => {
           auditStatus: '30',
           auditSort: row.auditSort,
         })
-        ElMessage.success('审批通过！系统正在流转...')
-
-        setTimeout(() => {
-          fetchList()
-        }, 300)
+        ElMessage.success('审批成功，已流转到下一节点')
+        await fetchList()
       } catch (error) {
         console.error('审批失败', error)
       }
+    })
+    .catch(() => {})
+}
+
+const handleOverrideApprove = (row) => {
+  const applicationId = Number(row?.applicationId || 0)
+  if (applicationId <= 0) {
+    ElMessage.error('申请单编号无效，无法一键审核')
+    return
+  }
+
+  ElMessageBox.prompt('可填写本次一键审核原因（选填）', '调度员一键审核', {
+    confirmButtonText: '确认一键审核',
+    cancelButtonText: '取消',
+    inputPlaceholder: '例如：紧急保障任务',
+    inputValue: '调度员一键审核',
+    center: true,
+  })
+    .then(async ({ value }) => {
+      await overrideApprove(applicationId, String(value || '').trim())
+      ElMessage.success('一键审核完成，系统已尝试自动分配车辆')
+      await fetchList()
     })
     .catch(() => {})
 }
@@ -277,10 +336,7 @@ const submitReject = async () => {
     })
     ElMessage.success('已驳回该申请')
     rejectDialogVisible.value = false
-
-    setTimeout(() => {
-      fetchList()
-    }, 300)
+    await fetchList()
   } catch (error) {
     console.error('驳回失败', error)
   } finally {
@@ -343,6 +399,15 @@ const submitReject = async () => {
 .search-box {
   display: flex;
   gap: 12px;
+  align-items: center;
+}
+.action-btn-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.mac-status-select {
+  width: 140px;
 }
 .mac-search-input {
   width: 280px;

@@ -30,3 +30,16 @@ export function updateAuditStatus(data) {
     data: data,
   })
 }
+
+/**
+ * 调度员一键审核（直接放行当前申请单剩余审批节点）
+ */
+export function overrideApprove(applicationId, reason) {
+  return request({
+    url: `/v1/audit/override/${applicationId}`,
+    method: 'post',
+    params: {
+      reason: reason || '',
+    },
+  })
+}

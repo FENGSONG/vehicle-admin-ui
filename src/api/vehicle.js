@@ -13,6 +13,17 @@ export function selectVehicle(params) {
 }
 
 /**
+ * 1.1 查询时间段内可分配车辆（后端按真实排班规则返回）
+ */
+export function selectAvailableVehicle(params) {
+  return request({
+    url: '/v1/vehicle/select/available',
+    method: 'get',
+    params: params,
+  })
+}
+
+/**
  * 2. 保存车辆 (新增或修改)
  * ⚠️ 注意：后端没有使用 @RequestBody，因此需要将请求头设为 application/x-www-form-urlencoded
  */
