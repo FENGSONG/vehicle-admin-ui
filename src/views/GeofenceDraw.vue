@@ -4,13 +4,14 @@
       <div id="map-container" class="mac-map"></div>
 
       <div class="mac-floating-panel">
-        <div class="panel-header">围栏绘制工具</div>
+        <div class="panel-header">电子围栏绘制工具</div>
         <p class="panel-tip">当前中心：北华大学北校区</p>
 
         <div class="draw-modes" style="margin-bottom: 12px">
           <el-radio-group v-model="drawMode" size="small" @change="clearDraw">
-            <el-radio-button label="rectangle">画矩形</el-radio-button>
+            <el-radio-button label="polygon">画多边形</el-radio-button>
             <el-radio-button label="circle">画圆形</el-radio-button>
+            <el-radio-button label="route">画路线</el-radio-button>
           </el-radio-group>
         </div>
 
@@ -26,10 +27,14 @@
     </div>
 
     <div class="mac-form-sidebar">
-      <h2 class="sidebar-title">围栏属性设置</h2>
+      <h2 class="sidebar-title">电子围栏属性设置</h2>
       <el-form :model="fenceForm" label-position="top">
         <el-form-item label="围栏名称 (name)">
           <el-input v-model="fenceForm.name" placeholder="例如：北校区核心调度区" />
+        </el-form-item>
+
+        <el-form-item v-if="drawMode === 'route'" label="偏离阈值 (米)">
+          <el-input-number v-model="fenceForm.deviationMeters" :min="20" :max="2000" :step="10" style="width: 100%" />
         </el-form-item>
 
         <el-form-item label="启用状态 (status)">
@@ -42,7 +47,7 @@
           <div class="coordinate-badge">
             <span v-if="!geoData" class="text-gray">暂未绘制区域</span>
             <span v-else class="text-green">
-              已生成 {{ geoData.type === 'circle' ? '圆形' : '矩形' }} 坐标数据
+              已生成 {{ shapeTextMap[geoData.type] || geoData.type }} 坐标数据
             </span>
           </div>
         </el-form-item>
@@ -70,9 +75,15 @@ import { saveGeofence } from '@/api/geofence'
 // 定义向父组件发射的事件（保存成功后告诉父组件切换 Tab）
 const emit = defineEmits(['save-success'])
 
-const fenceForm = reactive({ name: '' })
-const drawMode = ref('rectangle')
+const fenceForm = reactive({ name: '', deviationMeters: 200 })
+const drawMode = ref('polygon')
 const geoData = ref(null)
+const shapeTextMap = {
+  circle: '圆形',
+  rectangle: '矩形',
+  polygon: '多边形',
+  route: '路线',
+}
 
 let map = null
 let mouseTool = null
@@ -111,6 +122,12 @@ const initMap = () => {
             type: 'rectangle',
             recPoints: `${bounds.getSouthWest().lng},${bounds.getSouthWest().lat};${bounds.getNorthEast().lng},${bounds.getNorthEast().lat}`,
           }
+        } else if (drawMode.value === 'polygon') {
+          const path = currentShape.getPath() || []
+          geoData.value = {
+            type: 'polygon',
+            path: toPathString(path),
+          }
         } else if (drawMode.value === 'circle') {
           const center = currentShape.getCenter()
           const radius = currentShape.getRadius()
@@ -119,6 +136,13 @@ const initMap = () => {
             longitude: center.lng.toString(),
             latitude: center.lat.toString(),
             radius: radius.toString(),
+          }
+        } else if (drawMode.value === 'route') {
+          const path = currentShape.getPath() || []
+          geoData.value = {
+            type: 'route',
+            path: toPathString(path),
+            deviationMeters: Number(fenceForm.deviationMeters || 200),
           }
         }
         ElMessage.success('区域绘制完成！')
@@ -134,7 +158,7 @@ const startDraw = () => {
     ElMessage.warning('当前已有绘制的围栏，请先清除后再重新绘制。')
     return
   }
-  ElMessage.info(`请在地图上拖拽绘制${drawMode.value === 'circle' ? '圆形' : '矩形'}`)
+  ElMessage.info(`请在地图上绘制${shapeTextMap[drawMode.value] || '围栏'}`)
   const styleOptions = {
     fillColor: '#007aff',
     fillOpacity: 0.2,
@@ -142,8 +166,23 @@ const startDraw = () => {
     strokeWeight: 2,
     strokeOpacity: 0.9,
   }
-  if (drawMode.value === 'rectangle') mouseTool.rectangle(styleOptions)
-  else mouseTool.circle(styleOptions)
+  if (drawMode.value === 'circle') {
+    mouseTool.circle(styleOptions)
+    return
+  }
+  if (drawMode.value === 'polygon') {
+    mouseTool.polygon(styleOptions)
+    return
+  }
+  if (drawMode.value === 'route') {
+    mouseTool.polyline({
+      strokeColor: '#ff3b30',
+      strokeWeight: 4,
+      strokeOpacity: 0.95,
+    })
+    return
+  }
+  mouseTool.rectangle(styleOptions)
 }
 
 const clearDraw = () => {
@@ -162,15 +201,22 @@ const submitGeofence = async () => {
   }
   try {
     await saveGeofence(payload)
-    ElMessage.success('保存成功！新的地理围栏已入库')
+    ElMessage.success('保存成功！新的电子围栏已入库')
     clearDraw()
     fenceForm.name = ''
 
     // 触发事件通知父组件：我已经保存成功了，你可以切换到数据列表 Tab 啦！
     emit('save-success')
   } catch (error) {
-    console.error('保存地理围栏失败:', error)
+    console.error('保存电子围栏失败:', error)
   }
+}
+
+const toPathString = (path) => {
+  if (!Array.isArray(path) || path.length === 0) return ''
+  return path
+    .map((item) => `${item.lng},${item.lat}`)
+    .join(';')
 }
 </script>
 

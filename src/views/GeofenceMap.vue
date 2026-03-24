@@ -1,18 +1,22 @@
 <template>
   <div class="mac-page-container">
     <div class="page-header-container">
-      <h1 class="mac-page-title">地理围栏调度中心</h1>
+      <h1 class="mac-page-title">电子围栏调度中心</h1>
     </div>
 
     <div class="mac-divider"></div>
 
     <el-tabs v-model="activeTab" class="mac-tabs">
-      <el-tab-pane label="🗺️ 围栏绘制区" name="draw">
+      <el-tab-pane label="🗺️ 电子围栏绘制" name="draw">
         <GeofenceDraw v-if="activeTab === 'draw'" @save-success="handleSaveSuccess" />
       </el-tab-pane>
 
-      <el-tab-pane label="📋 已存围栏大盘" name="list">
+      <el-tab-pane label="📋 电子围栏列表" name="list">
         <GeofenceList ref="listRef" v-if="activeTab === 'list'" />
+      </el-tab-pane>
+
+      <el-tab-pane label="🚨 告警记录" name="alert">
+        <GeofenceAlertList ref="alertRef" v-if="activeTab === 'alert'" />
       </el-tab-pane>
     </el-tabs>
   </div>
@@ -23,9 +27,11 @@ import { ref, nextTick } from 'vue'
 // 导入我们拆分好的两个子组件
 import GeofenceDraw from './GeofenceDraw.vue'
 import GeofenceList from './GeofenceList.vue'
+import GeofenceAlertList from './GeofenceAlertList.vue'
 
 const activeTab = ref('draw')
 const listRef = ref(null)
+const alertRef = ref(null)
 
 // 接收绘制组件发来的 "保存成功" 事件
 const handleSaveSuccess = () => {
@@ -35,6 +41,9 @@ const handleSaveSuccess = () => {
   nextTick(() => {
     if (listRef.value) {
       listRef.value.fetchList()
+    }
+    if (alertRef.value) {
+      alertRef.value.fetchList()
     }
   })
 }

@@ -148,7 +148,7 @@ const allMenuItems = [
     allowedRoles: ['99'],
   },
   {
-    title: '地理围栏',
+    title: '电子围栏',
     icon: MapLocation,
     path: '/layout/geofence',
     perm: 'geofence:view',

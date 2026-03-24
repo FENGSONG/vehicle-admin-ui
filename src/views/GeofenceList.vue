@@ -1,11 +1,11 @@
 <template>
   <div class="mac-table-card">
     <div class="table-header-actions">
-      <h2 class="sidebar-title" style="margin-bottom: 0">数据列表</h2>
+      <h2 class="sidebar-title" style="margin-bottom: 0">电子围栏列表</h2>
       <div class="search-box">
         <el-input
           v-model="queryParams.name"
-          placeholder="搜索围栏名称..."
+          placeholder="搜索电子围栏名称..."
           prefix-icon="Search"
           clearable
           class="mac-search-input"
@@ -24,9 +24,9 @@
       :row-style="{ height: '64px' }"
     >
       <el-table-column prop="id" label="ID" width="70" align="center" />
-      <el-table-column prop="name" label="围栏名称" width="200" show-overflow-tooltip />
+      <el-table-column prop="name" label="电子围栏名称" width="200" show-overflow-tooltip />
 
-      <el-table-column label="围栏形状与范围" min-width="200">
+      <el-table-column label="围栏类型与范围" min-width="220">
         <template #default="{ row }">
           <div style="display: flex; align-items: center; gap: 8px">
             <el-tag :type="getShapeInfo(row.position).type" effect="light" round size="small">
@@ -138,7 +138,30 @@ const getShapeInfo = (posStr) => {
       return { name: '圆形', type: 'success', range: `覆盖半径 ${radiusKm} 公里` }
     } else if (data.type === 'rectangle') {
       return { name: '方形', type: 'primary', range: `矩形覆盖区域` }
+    } else if (data.type === 'polygon') {
+      const points = String(data.path || data.polygonPoints || '')
+        .split(';')
+        .filter((item) => String(item || '').trim()).length
+      return {
+        name: '多边形',
+        type: 'warning',
+        range: points > 0 ? `${points} 个拐点区域` : '多边形区域',
+      }
+    } else if (data.type === 'route') {
+      const points = String(data.path || '')
+        .split(';')
+        .filter((item) => String(item || '').trim()).length
+      const deviation = Number(data.deviationMeters || 0)
+      return {
+        name: '路线围栏',
+        type: 'danger',
+        range:
+          points > 0
+            ? `${points} 点路线，偏离阈值 ${deviation > 0 ? deviation : 200} 米`
+            : `偏离阈值 ${deviation > 0 ? deviation : 200} 米`,
+      }
     }
+    return { name: '未知类型', type: 'info', range: '--' }
   } catch {
     return { name: '解析异常', type: 'danger', range: '--' }
   }
@@ -156,11 +179,11 @@ const handleStatusChange = async (row) => {
 }
 
 const handleEditGuide = (row) => {
-  ElMessage.warning(`后端当前不支持编辑围栏【${row.name}】，请删除后在“围栏绘制区”重新创建`)
+  ElMessage.warning(`后端当前不支持编辑电子围栏【${row.name}】，请删除后在“电子围栏绘制”重新创建`)
 }
 
 const handleDelete = (row) => {
-  ElMessageBox.confirm(`确定要永久删除围栏【${row.name}】吗？`, '危险操作', {
+  ElMessageBox.confirm(`确定要永久删除电子围栏【${row.name}】吗？`, '危险操作', {
     confirmButtonText: '确定删除',
     cancelButtonText: '取消',
     type: 'error',

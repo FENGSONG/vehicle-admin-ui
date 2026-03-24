@@ -49,7 +49,7 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="地理围栏状态" min-width="240">
+        <el-table-column label="电子围栏状态" min-width="240">
           <template #default="{ row }">
             <div v-if="row.geofenceId" class="mac-fence-status bound">
               <el-icon><Location /></el-icon>
@@ -191,14 +191,14 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="bindVisible" title="分配地理围栏" width="400px" class="mac-dialog">
+    <el-dialog v-model="bindVisible" title="分配电子围栏" width="400px" class="mac-dialog">
       <div class="bind-dialog-content">
         <p class="bind-tip">
-          请为车牌号 <strong>{{ currentVehicleLicense }}</strong> 选择要绑定的地理围栏区域：
+          请为车牌号 <strong>{{ currentVehicleLicense }}</strong> 选择要绑定的电子围栏区域：
         </p>
         <el-select
           v-model="selectedFenceId"
-          placeholder="请选择地理围栏"
+          placeholder="请选择电子围栏"
           class="mac-select"
           style="width: 100%"
         >
@@ -507,7 +507,7 @@ const openBindDialog = async (row) => {
   selectedFenceId.value = null
   await loadGeofenceOptions()
   if (geofenceOptions.value.length === 0) {
-    ElMessage.warning('当前没有可绑定的启用围栏，请先到围栏页面创建并启用围栏')
+    ElMessage.warning('当前没有可绑定的启用电子围栏，请先到电子围栏页面创建并启用')
     return
   }
   bindVisible.value = true
